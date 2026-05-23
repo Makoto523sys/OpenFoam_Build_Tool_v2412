@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>OpenFOAM v2412 Case Builder v3</title>
+<title>OpenFOAM v2412 Case Builder v6</title>
 <style>
 :root{
   --bg:#f5f7fb;--card:#fff;--ink:#172033;--muted:#64748b;--line:#d7dee9;
@@ -34,8 +34,8 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
 </head>
 <body>
 <header>
-  <h1>OpenFOAM v2412 Case Builder v3</h1>
-  <p>境界用途・流量指定、controlDictヘルプ、functionObject詳細設定に加え、snappyHexMeshの複数形状ファイル選択に対応したHTML単体ケース生成ツールです。</p>
+  <h1>OpenFOAM v2412 Case Builder v6</h1>
+  <p>境界用途・流量指定、controlDictヘルプ、functionObject詳細設定、snappyHexMesh複数形状、blockMesh 6面patch割当、v2412向けmeshQualityDict.cfg include修正に対応したHTML単体ケース生成ツールです。</p>
 </header>
 
 <main>
@@ -254,6 +254,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
     <section class="panel">
       <h2>9. snappyHexMesh</h2>
       <div class="note ok">複数のSTL/OBJ等を選択すると、<span class="mono">constant/triSurface/</span> に同梱し、<span class="mono">geometry</span>、<span class="mono">features</span>、<span class="mono">refinementSurfaces</span>、<span class="mono">surfaceFeatureExtractDict</span> を形状ごとに生成します。</div>
+      <div class="note ok">v2412向けに <span class="mono">meshQualityControls</span> の include は <span class="mono">#includeEtc &quot;caseDicts/mesh/generation/meshQualityDict.cfg&quot;</span> を出力します。<span class="mono">nSmoothScale</span> と <span class="mono">errorReduction</span> もこのcfg側から読み込まれます。</div>
       <div class="grid3">
         <div><label class="help" data-help="複数の形状ファイルを選択できます。選択したファイルはZIPのconstant/triSurfaceへ同梱されます。">形状ファイルを選択</label><input id="geometryFilesPicker" type="file" multiple accept=".stl,.obj,.ply,.nas,.fms,.eMesh,.gz" /></div>
         <div><label class="help" data-help="流体領域内部の点です。全形状に対して共通のlocationInMeshとしてsnappyHexMeshDictに出力します。">locationInMesh</label><input id="locationInMesh" value="(0 0 0)" /></div>
@@ -265,6 +266,26 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
         <div><label class="help" data-help="背景格子の最大座標です。">boxMax</label><input id="boxMax" value="(1 0.5 0.5)" /></div>
         <div><label class="help" data-help="単位変換係数です。mm単位STLなら0.001です。">convertToMeters</label><input id="convertToMeters" type="number" step="any" value="1" /></div>
       </div>
+      <details open>
+        <summary>blockMesh の6面 patch 割当</summary>
+        <div class="note">背景hex boxの各面を、どのpatch名・patch typeにするか指定します。既定では <span class="mono">X- = inlet</span>, <span class="mono">X+ = outlet</span>, その他を <span class="mono">walls</span> にしています。</div>
+        <div class="btns" style="margin:8px 0">
+          <button id="bmPresetX" class="light">X方向流れ</button>
+          <button id="bmPresetY" class="light">Y方向流れ</button>
+          <button id="bmPresetZ" class="light">Z方向流れ</button>
+          <button id="bmPreset2DXY" class="ghost">2D XY: Z±をempty</button>
+          <button id="bmSyncPatches" class="secondary">0ディレクトリpatch表へ反映</button>
+        </div>
+        <div class="tableWrap"><table id="blockFaceTable"><thead><tr><th>面</th><th>座標側</th><th>patch名</th><th>blockMesh type</th><th>対応face頂点</th></tr></thead><tbody>
+          <tr><td>X-</td><td>x = min</td><td><input id="bmXMinusName" value="inlet" title="X-側のpatch名です。既定はinlet。"></td><td><select id="bmXMinusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 4 7 3)</td></tr>
+          <tr><td>X+</td><td>x = max</td><td><input id="bmXPlusName" value="outlet" title="X+側のpatch名です。既定はoutlet。"></td><td><select id="bmXPlusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(1 2 6 5)</td></tr>
+          <tr><td>Y-</td><td>y = min</td><td><input id="bmYMinusName" value="walls" title="Y-側のpatch名です。"></td><td><select id="bmYMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 1 5 4)</td></tr>
+          <tr><td>Y+</td><td>y = max</td><td><input id="bmYPlusName" value="walls" title="Y+側のpatch名です。Y-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmYPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(3 7 6 2)</td></tr>
+          <tr><td>Z-</td><td>z = min</td><td><input id="bmZMinusName" value="walls" title="Z-側のpatch名です。2D計算ではfrontAndBackなどにしてemptyを選ぶことが多いです。"></td><td><select id="bmZMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 3 2 1)</td></tr>
+          <tr><td>Z+</td><td>z = max</td><td><input id="bmZPlusName" value="walls" title="Z+側のpatch名です。Z-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmZPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(4 5 6 7)</td></tr>
+        </tbody></table></div>
+        <div class="note warn">同じpatch名を複数面に使う場合、blockMesh typeは同じにしてください。例: Y±/Z±をすべて <span class="mono">walls / wall</span> にすると1つのwalls patchへ結合します。</div>
+      </details>
       <div>
         <label class="inlineCheck"><input id="includeBlockMesh" type="checkbox" checked /> blockMeshDictを含める</label>
         <label class="inlineCheck"><input id="includeSnappy" type="checkbox" checked /> snappyHexMeshDictを含める</label>
@@ -373,7 +394,7 @@ function fmt(x){ const n=Number(x); if(!Number.isFinite(n)) return String(x); if
 function sanitizeCaseName(s){ return String(s||'case').trim().replace(/[^A-Za-z0-9_.+-]+/g,'_').replace(/^_+|_+$/g,'') || 'case'; }
 function header(cls,obj,loc){ return `/*--------------------------------*- C++ -*----------------------------------*\\
 | =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM v2412 Case Builder v3                 |
+| \\      /  F ield         | OpenFOAM v2412 Case Builder v6                 |
 |  \\    /   O peration     | ESI/OpenCFD style starter dictionary           |
 |   \\  /    A nd           | Generated by browser-side HTML                 |
 |    \\/     M anipulation  |                                                 |
@@ -415,6 +436,11 @@ function bindEvents(){
   $('addGeometry').addEventListener('click',()=>{addGeometry(defaultGeometry('part'+($('geometryTable').querySelectorAll('tbody tr').length+1)+'.stl')); generate();});
   $('resetGeometries').addEventListener('click',()=>{selectedGeometryFiles.clear(); $('geometryFilesPicker').value=''; resetGeometries(); generate();});
   $('geometryFilesPicker').addEventListener('change',handleGeometryFiles);
+  $('bmPresetX').addEventListener('click',()=>{setBlockMeshPreset('x'); generate();});
+  $('bmPresetY').addEventListener('click',()=>{setBlockMeshPreset('y'); generate();});
+  $('bmPresetZ').addEventListener('click',()=>{setBlockMeshPreset('z'); generate();});
+  $('bmPreset2DXY').addEventListener('click',()=>{setBlockMesh2DXY(); generate();});
+  $('bmSyncPatches').addEventListener('click',()=>{syncBlockMeshFacesToPatches(); generate();});
   $('generateBtn').addEventListener('click', generate); $('downloadZip').addEventListener('click', downloadZip); $('downloadSelected').addEventListener('click', downloadSelected);
   $('copyAll').addEventListener('click', copyAll); $('copySelected').addEventListener('click', copySelected); $('copySelected2').addEventListener('click', copySelected);
   $('previewSelect').addEventListener('change',()=>{selectedPath=$('previewSelect').value; renderPreview();});
@@ -463,6 +489,60 @@ function handleGeometryFiles(ev){
 function geometryNeedsManualCopy(){ return checked('includeSnappy') && getGeometries().some(g=>!selectedGeometryFiles.has(g.file)); }
 function quoteDictKey(s){ return /^[A-Za-z0-9_.-]+$/.test(s) ? s : `"${String(s).replace(/"/g,'\\"')}"`; }
 function geometryZipPath(root,file){ return `${root}/constant/triSurface/${file}`; }
+function blockMeshFaceDefs(){
+  return [
+    {axis:'X-', side:'x = min', key:'XMinus', name:val('bmXMinusName'), type:val('bmXMinusType'), face:'(0 4 7 3)'},
+    {axis:'X+', side:'x = max', key:'XPlus',  name:val('bmXPlusName'),  type:val('bmXPlusType'),  face:'(1 2 6 5)'},
+    {axis:'Y-', side:'y = min', key:'YMinus', name:val('bmYMinusName'), type:val('bmYMinusType'), face:'(0 1 5 4)'},
+    {axis:'Y+', side:'y = max', key:'YPlus',  name:val('bmYPlusName'),  type:val('bmYPlusType'),  face:'(3 7 6 2)'},
+    {axis:'Z-', side:'z = min', key:'ZMinus', name:val('bmZMinusName'), type:val('bmZMinusType'), face:'(0 3 2 1)'},
+    {axis:'Z+', side:'z = max', key:'ZPlus',  name:val('bmZPlusName'),  type:val('bmZPlusType'),  face:'(4 5 6 7)'}
+  ].map(f=>({...f, name:String(f.name||'').trim()||('patch_'+f.key), type:String(f.type||'patch').trim()||'patch'}));
+}
+function blockMeshGroupedPatches(){
+  const groups=[];
+  for(const f of blockMeshFaceDefs()){
+    let g=groups.find(x=>x.name===f.name);
+    if(!g){ g={name:f.name,type:f.type,faces:[],axes:[]}; groups.push(g); }
+    g.faces.push(f.face); g.axes.push(f.axis); if(g.type!==f.type) g.typeConflict=true;
+  }
+  return groups;
+}
+function blockMeshPatchPurpose(name,type){
+  const n=String(name||'').toLowerCase();
+  if(type==='empty') return 'empty';
+  if(type==='symmetryPlane') return 'symmetryPlane';
+  if(type==='wedge') return 'wedge';
+  if(type==='wall') return 'wallNoSlip';
+  if(n.includes('inlet')) return 'velocityInlet';
+  if(n.includes('outlet')) return 'pressureOutlet';
+  if(n.includes('wall')) return 'wallNoSlip';
+  return 'genericPatch';
+}
+function syncBlockMeshFacesToPatches(){
+  const existing=new Set(getPatches().map(p=>p.name));
+  for(const g of blockMeshGroupedPatches()){
+    if(!existing.has(g.name)){
+      addPatch({name:g.name, purpose:blockMeshPatchPurpose(g.name,g.type), U:g.name.toLowerCase().includes('inlet')?'(1 0 0)':'(0 0 0)', normal:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:g.name.toLowerCase().includes('inlet')?'1':'0'});
+      existing.add(g.name);
+    }
+  }
+}
+function setBlockMeshFace(idName,idType,name,type){ $(idName).value=name; $(idType).value=type; }
+function setBlockMeshPreset(axis){
+  const wall='walls';
+  setBlockMeshFace('bmXMinusName','bmXMinusType', axis==='x'?'inlet':wall, axis==='x'?'patch':'wall');
+  setBlockMeshFace('bmXPlusName','bmXPlusType', axis==='x'?'outlet':wall, axis==='x'?'patch':'wall');
+  setBlockMeshFace('bmYMinusName','bmYMinusType', axis==='y'?'inlet':wall, axis==='y'?'patch':'wall');
+  setBlockMeshFace('bmYPlusName','bmYPlusType', axis==='y'?'outlet':wall, axis==='y'?'patch':'wall');
+  setBlockMeshFace('bmZMinusName','bmZMinusType', axis==='z'?'inlet':wall, axis==='z'?'patch':'wall');
+  setBlockMeshFace('bmZPlusName','bmZPlusType', axis==='z'?'outlet':wall, axis==='z'?'patch':'wall');
+}
+function setBlockMesh2DXY(){
+  setBlockMeshPreset('x');
+  setBlockMeshFace('bmZMinusName','bmZMinusType','frontAndBack','empty');
+  setBlockMeshFace('bmZPlusName','bmZPlusType','frontAndBack','empty');
+}
 function resetPatches(){ const tbody=$('patchTable').querySelector('tbody'); tbody.innerHTML=''; [
   {name:'inlet', purpose:'velocityInlet', U:'(1 0 0)', normal:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:'1'},
   {name:'outlet', purpose:'pressureOutlet', U:'(0 0 0)', normal:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:'0'},
@@ -500,7 +580,30 @@ function patchFieldInternal(f,c){ if(f.object==='T') f.internal=`uniform ${fmt(n
 function renderFieldChips(keys){ $('fieldChips').innerHTML=keys.map(k=>`<span class="chip"><b>${esc(allFieldTemplates[k]?.object||k)}</b><span>${esc(allFieldTemplates[k]?.desc||'')}</span><button class="small" data-rm-field="${k}">×</button></span>`).join(''); $('fieldChips').querySelectorAll('[data-rm-field]').forEach(btn=>btn.addEventListener('click',()=>{manualFields=currentFields().filter(k=>k!==btn.dataset.rmField); generate();})); }
 function renderOutputs(){ const msgs=validate(); $('validationBox').className='note '+(msgs.some(m=>m.startsWith('注意')||m.startsWith('要確認'))?'warn':'ok'); $('validationBox').innerHTML=msgs.map(esc).join('<br>'); $('pathList').textContent=[...outputs.map(o=>o.path), ...[...selectedGeometryFiles.keys()].map(f=>geometryZipPath(cfg().caseName,f)+'  [binary geometry]')].join('\n'); const prev=selectedPath; $('previewSelect').innerHTML=outputs.map(o=>`<option value="${esc(o.path)}">${esc(o.path)}</option>`).join(''); selectedPath=outputs.find(o=>o.path===prev)?.path||outputs[0]?.path||''; $('previewSelect').value=selectedPath; renderPreview(); }
 function renderPreview(){ $('previewText').value=outputs.find(o=>o.path===selectedPath)?.text||''; }
-function validate(){ const c=cfg(), msgs=[]; const names=c.patches.map(p=>p.name); const dup=names.filter((x,i,a)=>a.indexOf(x)!==i); if(dup.length) msgs.push('要確認: patch名が重複しています: '+[...new Set(dup)].join(', ')); if(c.vof&&num('maxAlphaCo',1)>0.3) msgs.push('注意: VOFではmaxAlphaCoを0.1〜0.3程度から始めると安定しやすいです。'); if(val('turbulenceType')==='LES'&&(val('ddtScheme')==='Euler'||val('divUScheme').includes('upwind'))) msgs.push('注意: LES/DES本解析では過度なEuler/upwindは散逸的です。MVP後に見直してください。'); if(val('decompMethod')!=='scotch'){ const prod=(val('simpleN').match(/\d+/g)||[]).map(Number).reduce((a,b)=>a*b,1); if(prod!==num('nProc',1)) msgs.push(`要確認: simpleCoeffs nの積(${prod})とnumberOfSubdomains(${num('nProc',1)})が一致していません。`); } const flowP=c.patches.filter(p=>p.purpose.includes('FlowRate')); if(flowP.length) msgs.push('流量境界: '+flowP.map(p=>`${p.name}=${p.purpose}`).join(', ')+' を生成します。符号とnormal方向を確認してください。'); const geoms=getGeometries(); const badGeom=geoms.filter(g=>/\s/.test(g.file)||/\s/.test(g.name)); if(badGeom.length) msgs.push('要確認: 形状file/nameに空白があります。OpenFOAM辞書・ファイル管理上、空白なしを推奨します。'); if(checked('includeSnappy')) msgs.push(`snappyHexMesh: ${geoms.length}個の形状をgeometry/refinementSurfacesへ出力します。${geometryNeedsManualCopy()?'未選択ファイルはconstant/triSurfaceへ手動コピーしてください。':'選択済み形状ファイルをZIPへ同梱します。'}`); if(!msgs.length) msgs.push(`検査結果: ${outputs.length}ファイルを生成できます。checkMesh、Co、残差、保存則をOpenFOAM側で確認してください。`); return msgs; }
+function validate(){
+  const c=cfg(), msgs=[];
+  const names=c.patches.map(p=>p.name); const dup=names.filter((x,i,a)=>a.indexOf(x)!==i);
+  if(dup.length) msgs.push('要確認: patch名が重複しています: '+[...new Set(dup)].join(', '));
+  if(c.vof&&num('maxAlphaCo',1)>0.3) msgs.push('注意: VOFではmaxAlphaCoを0.1〜0.3程度から始めると安定しやすいです。');
+  if(val('turbulenceType')==='LES'&&(val('ddtScheme')==='Euler'||val('divUScheme').includes('upwind'))) msgs.push('注意: LES/DES本解析では過度なEuler/upwindは散逸的です。MVP後に見直してください。');
+  if(val('decompMethod')!=='scotch'){
+    const prod=(val('simpleN').match(/\d+/g)||[]).map(Number).reduce((a,b)=>a*b,1);
+    if(prod!==num('nProc',1)) msgs.push(`要確認: simpleCoeffs nの積(${prod})とnumberOfSubdomains(${num('nProc',1)})が一致していません。`);
+  }
+  const flowP=c.patches.filter(p=>p.purpose.includes('FlowRate'));
+  if(flowP.length) msgs.push('流量境界: '+flowP.map(p=>`${p.name}=${p.purpose}`).join(', ')+' を生成します。符号とnormal方向を確認してください。');
+  const bmGroups=blockMeshGroupedPatches();
+  const conflict=bmGroups.filter(g=>g.typeConflict);
+  if(conflict.length) msgs.push('要確認: blockMeshで同じpatch名に複数のtypeが指定されています: '+conflict.map(g=>g.name).join(', '));
+  const missingIn0=bmGroups.filter(g=>!names.includes(g.name)).map(g=>g.name);
+  if(checked('includeBlockMesh') && missingIn0.length) msgs.push('注意: blockMeshのpatchが0ディレクトリpatch表に未登録です。「0ディレクトリpatch表へ反映」を押すと追加できます: '+missingIn0.join(', '));
+  if(checked('includeBlockMesh')) msgs.push('blockMesh面割当: '+bmGroups.map(g=>`${g.name}/${g.type}=[${g.axes.join(',')}]`).join(' ; '));
+  const geoms=getGeometries(); const badGeom=geoms.filter(g=>/\s/.test(g.file)||/\s/.test(g.name));
+  if(badGeom.length) msgs.push('要確認: 形状file/nameに空白があります。OpenFOAM辞書・ファイル管理上、空白なしを推奨します。');
+  if(checked('includeSnappy')) msgs.push(`snappyHexMesh: ${geoms.length}個の形状をgeometry/refinementSurfacesへ出力します。${geometryNeedsManualCopy()?'未選択ファイルはconstant/triSurfaceへ手動コピーしてください。':'選択済み形状ファイルをZIPへ同梱します。'}`);
+  if(!msgs.length) msgs.push(`検査結果: ${outputs.length}ファイルを生成できます。checkMesh、Co、残差、保存則をOpenFOAM側で確認してください。`);
+  return msgs;
+}
 function fieldFile(f,c){ const lines=[header(f.className,f.object,'0'),`dimensions      ${f.dims};`,'',`internalField   ${f.internal};`,'','boundaryField','{']; for(const p of c.patches){ lines.push(`    ${p.name}`,'    {'); for(const line of bcForField(f,p,c).split('\n')) lines.push('        '+line); lines.push('    }',''); } lines.push('}','// ************************************************************************* //'); return lines.join('\n'); }
 function fixedValue(v){ return `type            fixedValue;\nvalue           uniform ${v};`; }
 function zeroGradient(){ return 'type            zeroGradient;'; }
@@ -604,7 +707,56 @@ function thermophysicalProperties(){ const m=materials[val('material')]||materia
 function gFile(){ return header('uniformDimensionedVectorField','g','constant')+`dimensions      [0 1 -2 0 0 0 0];\nvalue           ${val('gVec')};\n\n// ************************************************************************* //\n`; }
 function regionProperties(){ return header('dictionary','regionProperties','constant')+`regions\n(\n    fluid   (fluid)\n    solid   (solid)\n);\n\n// chtMultiRegionFoamではregionごとの0/constant/system調整が必要です。\n// ************************************************************************* //\n`; }
 function decomposeParDict(){ const ns=(val('simpleN').match(/\d+/g)||['2','2','1']).slice(0,3).join(' '); return header('dictionary','decomposeParDict','system')+`numberOfSubdomains ${val('nProc')};\nmethod          ${val('decompMethod')};\n\nsimpleCoeffs\n{\n    n           (${ns});\n    delta       0.001;\n}\n\nhierarchicalCoeffs\n{\n    n           (${ns});\n    delta       0.001;\n    order       xyz;\n}\n\nscotchCoeffs\n{\n}\n\ndistributed     ${val('distributed')};\nroots           ( );\n\n// ************************************************************************* //\n`; }
-function blockMeshDict(){ const min=parseVec(val('boxMin'),[-1,-.5,-.5]), max=parseVec(val('boxMax'),[1,.5,.5]); const cells=(val('blockCells').match(/\d+/g)||['40','20','20']).slice(0,3).join(' '); const [x0,y0,z0]=min,[x1,y1,z1]=max; return header('dictionary','blockMeshDict','system')+`convertToMeters ${val('convertToMeters')};\n\nvertices\n(\n    (${x0} ${y0} ${z0})\n    (${x1} ${y0} ${z0})\n    (${x1} ${y1} ${z0})\n    (${x0} ${y1} ${z0})\n    (${x0} ${y0} ${z1})\n    (${x1} ${y0} ${z1})\n    (${x1} ${y1} ${z1})\n    (${x0} ${y1} ${z1})\n);\n\nblocks\n(\n    hex (0 1 2 3 4 5 6 7) (${cells}) simpleGrading (1 1 1)\n);\n\nedges ();\n\nboundary\n(\n    inlet { type patch; faces ((0 4 7 3)); }\n    outlet { type patch; faces ((1 2 6 5)); }\n    walls { type wall; faces ((0 1 5 4) (3 7 6 2) (0 3 2 1) (4 5 6 7)); }\n);\n\nmergePatchPairs ();\n\n// ************************************************************************* //\n`; }
+function blockMeshDict(){
+  const min=parseVec(val('boxMin'),[-1,-.5,-.5]), max=parseVec(val('boxMax'),[1,.5,.5]);
+  const cells=(val('blockCells').match(/\d+/g)||['40','20','20']).slice(0,3).join(' ');
+  const [x0,y0,z0]=min,[x1,y1,z1]=max;
+  const patches=blockMeshGroupedPatches().map(g=>`    ${quoteDictKey(g.name)}
+    {
+        type ${g.type};
+        faces
+        (
+${g.faces.map(f=>'            '+f).join('\n')}
+        );
+    }`).join('\n');
+  return header('dictionary','blockMeshDict','system')+`convertToMeters ${val('convertToMeters')};
+
+vertices
+(
+    (${x0} ${y0} ${z0})
+    (${x1} ${y0} ${z0})
+    (${x1} ${y1} ${z0})
+    (${x0} ${y1} ${z0})
+    (${x0} ${y0} ${z1})
+    (${x1} ${y0} ${z1})
+    (${x1} ${y1} ${z1})
+    (${x0} ${y1} ${z1})
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (${cells}) simpleGrading (1 1 1)
+);
+
+edges ();
+
+boundary
+(
+${patches}
+);
+
+mergePatchPairs ();
+
+// Face map:
+// X- (x=min): (0 4 7 3)
+// X+ (x=max): (1 2 6 5)
+// Y- (y=min): (0 1 5 4)
+// Y+ (y=max): (3 7 6 2)
+// Z- (z=min): (0 3 2 1)
+// Z+ (z=max): (4 5 6 7)
+
+// ************************************************************************* //
+`; }
 function snappyHexMeshDict(){
   const geoms=getGeometries();
   const geometryEntries=geoms.map(g=>`    ${quoteDictKey(g.file)}
@@ -690,7 +842,8 @@ ${layerEntries || '        // layers disabled for all geometry rows'}
 
 meshQualityControls
 {
-    #includeEtc "caseDicts/mesh/generation/meshQualityDict"
+    #includeEtc "caseDicts/mesh/generation/meshQualityDict.cfg"
+    // v2412: cfg includes nSmoothScale and errorReduction required during snap.
     relaxed { maxNonOrtho 75; }
 }
 
@@ -717,7 +870,15 @@ function surfaceFeatureExtractDict(){
 function setFieldsDict(c){ return header('dictionary','setFieldsDict','system')+`defaultFieldValues\n(\n    volScalarFieldValue alpha.water 0\n);\n\nregions\n(\n    boxToCell\n    {\n        box (-1 -1 -1) (0 1 1);\n        fieldValues\n        (\n            volScalarFieldValue alpha.water 1\n        );\n    }\n);\n\n// 初期水位・液相領域に合わせてboxを必ず修正してください。\n// ************************************************************************* //\n`; }
 function allrun(c){ const np=val('nProc'); return `#!/bin/sh\ncd "\${0%/*}" || exit 1\n. \${WM_PROJECT_DIR:?}/bin/tools/RunFunctions\n\nrunApplication blockMesh\n${checked('includeSnappy')?`runApplication surfaceFeatureExtract\nrunApplication snappyHexMesh -overwrite\n`:''}runApplication checkMesh -allTopology -allGeometry\n${c.vof?'runApplication setFields\n':''}\nrunApplication decomposePar\nrunParallel ${val('solver')} ${np}\nrunApplication reconstructPar\n\ntouch ${c.caseName}.foam\n`; }
 function allclean(){ return `#!/bin/sh\ncd "\${0%/*}" || exit 1\n. \${WM_PROJECT_DIR:?}/bin/tools/CleanFunctions\n\ncleanCase\nrm -rf processor* postProcessing constant/polyMesh dynamicCode log.* *.foam\n`; }
-function readme(c,fields){ return `# ${c.caseName}\n\nGenerated by OpenFOAM v2412 Case Builder v3.\n\n## Main settings\n\n- Solver: ${val('solver')}\n- Physics: ${val('physicsMode')}\n- Time mode: ${val('timeMode')}\n- Turbulence: ${val('turbulenceType')} ${val('turbulenceType')==='RAS'?val('rasModel'):val('turbulenceType')==='LES'?val('lesModel'):''}\n- Fields: ${fields.map(k=>allFieldTemplates[k]?.object||k).join(', ')}\n\n## Boundary notes\n\nThis version supports velocity inlet, volumetric-flow inlet/outlet, mass-flow inlet/outlet, pressure inlet/outlet, noSlip/slip/moving wall, symmetry, empty, wedge, cyclic, cyclicAMI, atmosphere, and generic patch purposes.\nFor flow-rate boundaries, check the sign convention, patch normal direction, and rho.\n\n## snappyHexMesh geometry\n\nThis case uses the following geometry entries:\n\n${getGeometries().map(g=>`- ${g.file} -> name=${g.name}, level=(${g.levelMin} ${g.levelMax}), feature=${g.featureFile}, layers=${g.layers}`).join('\\n')}\n\nSelected browser files are bundled under constant/triSurface/. If a listed file was not selected in the browser, copy it there manually before surfaceFeatureExtract and snappyHexMesh.\n\n## WSL workflow\n\n\`\`\`bash\nmkdir -p ${val('wslPath')}\ncd ${val('wslPath')}\nunzip ${c.caseName}.zip\ncd ${c.caseName}\nchmod +x Allrun Allclean\n./Allrun\n\`\`\`\n\n## Verification checklist\n\n1. checkMesh -allTopology -allGeometry.\n2. Residuals + physical quantities + conservation, not residuals alone.\n3. Mass balance: compare inlet/outlet patchFlux functionObject outputs.\n4. Heat cases: wallHeatFlux and energy balance.\n5. VOF: alpha volume conservation, interface smearing, spurious currents, maxAlphaCo.\n6. Parallel: decomposePar logs, processor load, reconstructPar.\n\n## Memo\n\n${val('caseMemo')}\n`; }
+function readme(c,fields){ return `# ${c.caseName}\n\nGenerated by OpenFOAM v2412 Case Builder v6.\n\n## Main settings\n\n- Solver: ${val('solver')}\n- Physics: ${val('physicsMode')}\n- Time mode: ${val('timeMode')}\n- Turbulence: ${val('turbulenceType')} ${val('turbulenceType')==='RAS'?val('rasModel'):val('turbulenceType')==='LES'?val('lesModel'):''}\n- Fields: ${fields.map(k=>allFieldTemplates[k]?.object||k).join(', ')}\n\n## Boundary notes\n\nThis version supports velocity inlet, volumetric-flow inlet/outlet, mass-flow inlet/outlet, pressure inlet/outlet, noSlip/slip/moving wall, symmetry, empty, wedge, cyclic, cyclicAMI, atmosphere, and generic patch purposes.\nFor flow-rate boundaries, check the sign convention, patch normal direction, and rho.\n\n## WSL workflow\n\n\`\`\`bash\nmkdir -p ${val('wslPath')}\ncd ${val('wslPath')}\nunzip ${c.caseName}.zip\ncd ${c.caseName}\nchmod +x Allrun Allclean\n./Allrun\n\`\`\`\n\n## snappyHexMesh v2412 note
+
+system/snappyHexMeshDict uses:
+
+    #includeEtc "caseDicts/mesh/generation/meshQualityDict.cfg"
+
+Do not change it back to meshQualityDict; the .cfg file also supplies snap-stage entries such as nSmoothScale and errorReduction.
+
+## Verification checklist\n\n1. checkMesh -allTopology -allGeometry.\n2. Residuals + physical quantities + conservation, not residuals alone.\n3. Mass balance: compare inlet/outlet patchFlux functionObject outputs.\n4. Heat cases: wallHeatFlux and energy balance.\n5. VOF: alpha volume conservation, interface smearing, spurious currents, maxAlphaCo.\n6. Parallel: decomposePar logs, processor load, reconstructPar.\n\n## Memo\n\n${val('caseMemo')}\n`; }
 function downloadSelected(){ const o=outputs.find(x=>x.path===selectedPath); if(o) saveBlob(new Blob([o.text],{type:'text/plain'}),o.path.split('/').pop()); }
 async function copySelected(){ try{ await navigator.clipboard.writeText($('previewText').value); }catch(e){ $('previewText').select(); document.execCommand('copy'); } }
 async function copyAll(){ const text=outputs.map(o=>`// ===== ${o.path} =====\n${o.text}`).join('\n\n'); try{ await navigator.clipboard.writeText(text); }catch(e){ $('previewText').value=text; } }
