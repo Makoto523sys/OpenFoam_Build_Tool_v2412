@@ -154,14 +154,14 @@ test('clearing or replacing with an invalid STL blocks export and removes the pr
   } finally {a.close();}
 });
 
-test('v2 project round-trip preserves dedicated water data, original units, and identical generated surface', async () => {
+test('v3 project round-trip preserves dedicated water data, original units, and identical generated surface', async () => {
   const a = waterApp(), b = app();
   try {
     a.set('caseName', 'water_roundtrip');
     a.set('waterRegionScale', '0.001');
     await a.api.importWaterRegionFile(fileFor(a, 'pool_mm.stl', cube([0,0,0],[1500,750,400])));
     const snapshot = plain(a.api.projectSnapshot());
-    assert.equal(snapshot.version, 2);
+    assert.equal(snapshot.version, 3);
     assert.equal(snapshot.parts.length, 0);
     assert.equal(snapshot.auxiliary.water.fileName, 'pool_mm.stl');
     b.api.restoreProject(snapshot);

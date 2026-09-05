@@ -11,7 +11,7 @@ for(const solver of ['interFoam','interIsoFoam'])test(`${solver}: CSV produces S
   assert.equal(a.d.querySelectorAll('#accelerationPlot polyline').length,3);assert.match(a.d.getElementById('accelerationStatus').textContent,/2点/);
   assert.deepEqual([...a.api.blockingErrors()],[]);assert.equal(a.errors.length,0);
 }finally{a.close();}});
-test('acceleration unit changes re-convert raw values once and v2 JSON roundtrip reproduces output',async()=>{const a=app();try{
+test('acceleration unit changes re-convert raw values once and v3 JSON roundtrip reproduces output',async()=>{const a=app();try{
   setup(a);const raw='0,1,0,-1\n2,0,2,0\n';await a.api.importAccelerationFile(csv(raw));a.set('accelerationUnit','g');
   assert.match(a.file('constant/acceleration/translation.dat'),/9.80665 0 -9.80665/);a.set('accelerationUnit','m/s2');assert.match(a.file('constant/acceleration/translation.dat'),/\(1 0 -1\)/);
   a.set('accelerationUnit','Gal');const before=a.file('constant/acceleration/translation.dat'),data=JSON.parse(JSON.stringify(a.api.projectSnapshot()));

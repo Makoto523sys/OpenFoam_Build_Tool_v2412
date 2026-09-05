@@ -3,7 +3,7 @@ const {JSDOM,VirtualConsole}=require('jsdom');
 function app(){
   const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e));
   // Only the test harness gets an introspection hook; the distributed HTML does not.
-  const html=fs.readFileSync(require.resolve('../OpenFOAM_v2412_case_builder_v3.html'),'utf8').replace('init();\ninitWorkbench();','window.testAPI={Geometry,geometryParts,getPatches,allFaces,outputs:()=>outputs,blockingErrors,importGeometryFiles,restoreProject,makeZip,bcForField,cfg,importAccelerationFile,importWaterRegionFile,projectSnapshot,accelerationSamples,waterOutputName};\ninit();\ninitWorkbench();');
+  const html=fs.readFileSync(require.resolve('../OpenFOAM_v2412_case_builder_v3.html'),'utf8').replace('init();\ninitWorkbench();','window.testAPI={Geometry,geometryParts,getPatches,allFaces,outputs:()=>outputs,blockingErrors,importGeometryFiles,restoreProject,makeZip,bcForField,cfg,importAccelerationFile,importWaterRegionFile,projectSnapshot,accelerationSamples,waterOutputName,Waveform,waveformConfig,waveformResult};\ninit();\ninitWorkbench();');
   const dom=new JSDOM(html,{runScripts:'dangerously',virtualConsole:vc,beforeParse(w){w.TextEncoder=TextEncoder;w.TextDecoder=TextDecoder;w.ResizeObserver=class{observe(){}};w.HTMLCanvasElement.prototype.getContext=()=>null;}});
   if(errors.length)throw errors[0];const w=dom.window,d=w.document;
   const set=(id,value)=>{const el=d.getElementById(id);if(el.type==='checkbox')el.checked=value;else el.value=value;el.dispatchEvent(new w.Event('input',{bubbles:true}));};

@@ -42,13 +42,57 @@
 </section>
 <section class="panel workbench" id="accelerationPanel">
   <h2>スロッシング：容器の入力加速度</h2>
-  <label class="inlineCheck" for="enableAcceleration"><input id="enableAcceleration" type="checkbox">時刻歴CSVによる並進加速度を有効にする</label>
-  <p class="hint" id="accelerationHelp">interFoam / interIsoFoam ＋ 固定メッシュに対応。回転しない容器に固定した座標系で解き、重力 g に対し g − 入力加速度 が作用します。CSVには重力を含めず、容器の加速度の符号をそのまま入力してください。</p>
+  <label class="inlineCheck" for="enableAcceleration"><input id="enableAcceleration" type="checkbox">容器の並進加速度入力を有効にする</label>
+  <p class="hint" id="accelerationHelp">interFoam / interIsoFoam ＋ 固定メッシュに対応。回転しない容器に固定した座標系で解き、重力 g に対し g − 入力加速度 が作用します。CSV・数式には重力を含めず、容器の加速度の符号をそのまま入力してください。</p>
+  <label for="accelerationSource">使用する加速度</label><select id="accelerationSource"><option value="csv">CSVを読み込む</option><option value="waveform">軸別の数式で生成</option></select>
+  <p id="accelerationSourceHint" class="hint"></p>
   <div id="accelerationControls">
     <div class="grid2"><div><label for="accelerationPicker">CSV：時間、X加速度、Y加速度、Z加速度</label><input id="accelerationPicker" type="file" accept=".csv,text/csv" aria-describedby="accelerationFormat"></div><div><label for="accelerationUnit">CSVの加速度単位（時間は秒）</label><select id="accelerationUnit"><option value="m/s2">m/s²</option><option value="Gal">Gal（cm/s² → ×0.01）</option><option value="g">g（標準重力 → ×9.80665）</option></select></div></div>
     <p class="hint" id="accelerationFormat">ここでCSVを読み込むと入力加速度が有効になります。カンマ区切り4列。見出し time,ax,ay,az は省略できます。時刻は0以上・昇順・重複なし。解析開始〜終了を含み、終端に最大時間刻み1回分（adjustableRunTimeでは2回分）の余裕を持つデータが必要です。可変時間刻みではcontrolDictのmaxDeltaTを正の値にしてください。下のボタンで余裕を残した解析時間を設定できます。</p>
-    <div class="btns"><button id="downloadAccelerationExample" class="light">CSVひな形を保存</button><button id="applyAccelerationTimeRange" class="ghost">CSV範囲に解析時間を合わせる</button><button id="clearAcceleration" class="secondary">CSVを解除</button></div>
-    <div id="accelerationPreview" hidden><svg id="accelerationPlot" viewBox="0 0 760 230" role="img" aria-label="入力加速度の時刻歴。Xは赤、Yは緑、Zは青。表示は入力点を結ぶ線。"></svg><p class="hint">赤実線：X、緑破線：Y、青点線：Z。表示は入力点の折れ線（SI単位）です。OpenFOAM v2412は実計算でスプライン補間するため、点間で入力値を超える場合があります。範囲外への外挿はできません。</p></div>
+    <div class="btns"><button id="downloadAccelerationExample" class="light">CSVひな形を保存</button><button id="applyAccelerationTimeRange" class="ghost">使用中の時刻歴に解析時間を合わせる</button><button id="clearAcceleration" class="secondary">CSVを解除</button></div>
+<section id="waveformControls" class="waveform-settings" aria-labelledby="waveformHeading">
+  <h3 id="waveformHeading">数式から加速度時刻歴を作成</h3>
+  <p class="hint">X・Y・Zを独立に設定します。正弦波は a(t) = b + A sin[2π f (t − t₀) + φ]、周期 T = 1/f。Aは変位ではなく加速度の片振幅です。生成時間の範囲で数式を評価します。</p>
+  <div class="grid4"><div><label for="waveStartTime">生成開始 t₀ [s]</label><input id="waveStartTime" type="number" min="0" step="any" value="0"></div><div><label for="waveEndTime">生成終了 [s]</label><input id="waveEndTime" type="number" min="0" step="any" value="10"></div><div><label for="waveSampleInterval">標本間隔 [s]</label><input id="waveSampleInterval" type="number" min="0" step="any" value="0.01"></div><div><label for="waveUnit">数式の加速度単位</label><select id="waveUnit"><option value="m/s2">m/s²</option><option value="Gal">Gal（cm/s²）</option><option value="g">g（標準重力）</option></select></div></div>
+  <p class="hint">標本間隔はソルバーの時間刻みとは別です。正弦波・余弦波は最短周期の1/100以下を目安とし、最低20点/周期で生成します。解析終了後の時間刻みの余裕も生成範囲に含めてください。</p>
+  <div class="wave-axes"><fieldset class="wave-axis"><legend>X方向</legend>
+  <label for="waveXKind">波形の種類</label><select id="waveXKind"><option value="zero">加速度なし（0）</option><option value="sine" selected>正弦波 sin</option><option value="cosine">余弦波 cos</option><option value="constant">一定値</option><option value="expression">数式を入力</option></select>
+  <div id="waveXOscillation">
+    <label for="waveXAmplitude">加速度の片振幅 A（選択した単位）</label><input id="waveXAmplitude" type="number" step="any" value="1">
+    <div class="grid2"><div><label for="waveXCycleMode">周期 / 周波数で指定</label><select id="waveXCycleMode"><option value="period">周期 [s]</option><option value="frequency">周波数 [Hz]</option></select></div><div><label for="waveXCycle" id="waveXCycleLabel">周期 T [s]</label><input id="waveXCycle" type="number" step="any" min="0" value="1"></div></div>
+    <p id="waveXCycleInfo" class="hint"></p>
+    <label for="waveXPhase">開始時刻 t₀ の位相 [°]</label><input id="waveXPhase" type="number" step="any" value="0">
+  </div>
+  <div id="waveXBias"><label for="waveXOffset">オフセット / 一定加速度 b（選択した単位）</label><input id="waveXOffset" type="number" step="any" value="0"></div>
+  <div id="waveXCustom" hidden><label for="waveXExpression">加速度の数式</label><textarea id="waveXExpression" rows="2" maxlength="512" aria-describedby="waveExpressionHelp">b + A*sin(2*pi*f*tau + phi)</textarea></div>
+  <p id="waveXEquation" class="wave-equation"></p>
+</fieldset><fieldset class="wave-axis"><legend>Y方向</legend>
+  <label for="waveYKind">波形の種類</label><select id="waveYKind"><option value="zero" selected>加速度なし（0）</option><option value="sine">正弦波 sin</option><option value="cosine">余弦波 cos</option><option value="constant">一定値</option><option value="expression">数式を入力</option></select>
+  <div id="waveYOscillation">
+    <label for="waveYAmplitude">加速度の片振幅 A（選択した単位）</label><input id="waveYAmplitude" type="number" step="any" value="1">
+    <div class="grid2"><div><label for="waveYCycleMode">周期 / 周波数で指定</label><select id="waveYCycleMode"><option value="period">周期 [s]</option><option value="frequency">周波数 [Hz]</option></select></div><div><label for="waveYCycle" id="waveYCycleLabel">周期 T [s]</label><input id="waveYCycle" type="number" step="any" min="0" value="1"></div></div>
+    <p id="waveYCycleInfo" class="hint"></p>
+    <label for="waveYPhase">開始時刻 t₀ の位相 [°]</label><input id="waveYPhase" type="number" step="any" value="0">
+  </div>
+  <div id="waveYBias"><label for="waveYOffset">オフセット / 一定加速度 b（選択した単位）</label><input id="waveYOffset" type="number" step="any" value="0"></div>
+  <div id="waveYCustom" hidden><label for="waveYExpression">加速度の数式</label><textarea id="waveYExpression" rows="2" maxlength="512" aria-describedby="waveExpressionHelp">b + A*sin(2*pi*f*tau + phi)</textarea></div>
+  <p id="waveYEquation" class="wave-equation"></p>
+</fieldset><fieldset class="wave-axis"><legend>Z方向</legend>
+  <label for="waveZKind">波形の種類</label><select id="waveZKind"><option value="zero" selected>加速度なし（0）</option><option value="sine">正弦波 sin</option><option value="cosine">余弦波 cos</option><option value="constant">一定値</option><option value="expression">数式を入力</option></select>
+  <div id="waveZOscillation">
+    <label for="waveZAmplitude">加速度の片振幅 A（選択した単位）</label><input id="waveZAmplitude" type="number" step="any" value="1">
+    <div class="grid2"><div><label for="waveZCycleMode">周期 / 周波数で指定</label><select id="waveZCycleMode"><option value="period">周期 [s]</option><option value="frequency">周波数 [Hz]</option></select></div><div><label for="waveZCycle" id="waveZCycleLabel">周期 T [s]</label><input id="waveZCycle" type="number" step="any" min="0" value="1"></div></div>
+    <p id="waveZCycleInfo" class="hint"></p>
+    <label for="waveZPhase">開始時刻 t₀ の位相 [°]</label><input id="waveZPhase" type="number" step="any" value="0">
+  </div>
+  <div id="waveZBias"><label for="waveZOffset">オフセット / 一定加速度 b（選択した単位）</label><input id="waveZOffset" type="number" step="any" value="0"></div>
+  <div id="waveZCustom" hidden><label for="waveZExpression">加速度の数式</label><textarea id="waveZExpression" rows="2" maxlength="512" aria-describedby="waveExpressionHelp">b + A*sin(2*pi*f*tau + phi)</textarea></div>
+  <p id="waveZEquation" class="wave-equation"></p>
+</fieldset></div>
+  <details><summary>数式で使用できる変数・関数</summary><p id="waveExpressionHelp" class="hint">t：ケース時刻 [s]、tau：t − t₀ [s]、A：振幅、b：オフセット、f：周波数 [Hz]、T：周期 [s]、phi：位相 [rad]。位相欄の度数は自動でradへ変換します。pi、e、+ − * / ^、括弧、sin・cos・tan・exp・log・sqrt・abs（引数1個）、min・max（引数2個）に対応。三角関数の引数はradです。掛け算の * は省略できません。例：b + A*exp(-0.1*tau)*sin(2*pi*f*tau + phi)。数式モードでは振幅・オフセットも式の中で指定します。</p></details>
+  <div class="btns"><button id="useWaveform" class="green">波形を生成して使用</button><button id="downloadWaveformCSV" class="light">生成波形をCSVで保存</button></div>
+</section>
+    <div id="accelerationPreview" hidden><svg id="accelerationPlot" viewBox="0 0 760 230" role="img" aria-label="入力加速度の時刻歴。Xは赤、Yは緑、Zは青。表示は入力点を結ぶ線。"></svg><p class="hint">赤実線：X、緑破線：Y、青点線：Z。表示は入力点の折れ線（SI単位）です。数式の波形も標本化した時刻歴として出力します。OpenFOAM v2412は実計算でスプライン補間するため、点間で入力値を超える場合があります。範囲外への外挿はできません。</p></div>
   </div>
   <div id="accelerationStatus" class="note" role="status" aria-live="polite"></div>
 </section>
