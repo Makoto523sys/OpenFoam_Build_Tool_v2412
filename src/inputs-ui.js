@@ -73,6 +73,7 @@ function auxiliaryGuide(c){
 }
 async function importAccelerationFile(file){
   if(!file)return;
+  $('enableAcceleration').checked=true;
   const revision=++accelerationRevision;auxiliaryBusy++;accelerationInput=null;accelerationError='';accelerationCache=null;generate();
   try{
     if(file.size>20*1024*1024)throw Error('加速度CSVは20 MB以下にしてください。');
@@ -84,6 +85,7 @@ async function importAccelerationFile(file){
 }
 async function importWaterRegionFile(file){
   if(!file)return;
+  $('waterRegionMode').value='stl';
   const revision=++waterRevision;auxiliaryBusy++;initialWaterInput=null;initialWaterError='';waterExportCache=null;refreshWaterViewer();generate();
   try{
     if(file.size>80*1024*1024)throw Error('初期水領域STLは80 MB以下にしてください。');
@@ -116,12 +118,12 @@ function drawAccelerationPlot(samples){
 function updateAuxiliaryInputsUI(){
   if(!auxiliaryReady)return;
   const c=cfg(),stl=val('waterRegionMode')==='stl';
-  $('waterBoxControls').hidden=stl;$('waterSTLControls').hidden=!stl;
+  $('waterBoxControls').hidden=stl;$('waterRegionPreview').hidden=!stl||!initialWaterInput;
   let waterText=!c.vof?'VOFソルバー選択時に初期水領域を出力します。設定と専用STLは保持されます。':stl?'初期水領域専用STLを読み込んでください。':'指定ボックス内を alpha.water = 1、外を0にします。';
   if(stl&&initialWaterInput){if(c.vof)waterText='初期水領域STLを読み込み済みです。';const p=initialWaterInput.prepared,s=Number(val('waterRegionScale')),coord=v=>'('+v.map(x=>Number((x*s).toPrecision(6))).join(' ')+')';waterText+=`\n${initialWaterInput.fileName} / ${p.faces.length.toLocaleString()}三角形 / 閉曲面・外向き\n範囲 [m]: ${coord(p.bounds.min)} → ${coord(p.bounds.max)}\nメッシュ用とは独立した初期水領域です。自己交差・位置関係はsurfaceCheckと実メッシュで確認してください。`;}
   const waterActiveError=c.vof&&stl?initialWaterError:'';statusNote('waterRegionStatus',waterActiveError||waterText,!!waterActiveError);
   if(stl)waterViewer?.draw();
-  const enabled=checked('enableAcceleration');$('accelerationControls').hidden=!enabled;
+  const enabled=checked('enableAcceleration');
   let accelText=enabled?'加速度CSVを読み込んでください。':'時刻歴加速度は無効です。通常の重力設定を使用します。',err=enabled?accelerationError:'',samples=[];
   if(accelerationInput&&!err)try{samples=accelerationSamples();if(enabled){const peaks=[0,0,0];for(const sample of samples)sample.acceleration.forEach((a,i)=>peaks[i]=Math.max(peaks[i],Math.abs(a)));accelText=`${accelerationInput.fileName} / ${samples.length.toLocaleString()}点 / ${samples[0].time} 〜 ${samples.at(-1).time} s\n入力点の最大絶対値 [m/s²]: X=${peaks[0]} / Y=${peaks[1]} / Z=${peaks[2]}`;const validation=auxiliaryInputErrors(c).filter(e=>!e.startsWith('初期水')&&!e.startsWith('CSV /'));if(validation.length)err=validation.join('\n');}}catch(e){if(enabled)err=e.message;}
   statusNote('accelerationStatus',err||accelText,!!err);$('accelerationPreview').hidden=!enabled||!samples.length;if(enabled&&samples.length)drawAccelerationPlot(samples);

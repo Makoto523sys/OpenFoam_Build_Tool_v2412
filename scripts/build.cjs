@@ -7,4 +7,6 @@ for (const name of ['geometry', 'viewer', 'acceleration', 'water-region', 'workb
   const code = fs.readFileSync(path.join(root, `src/${name}.js`), 'utf8');
   html = html.replace(`/* BUILD:${name} */`, () => code);
 }
-fs.writeFileSync(path.join(root, 'OpenFOAM_v2412_case_builder_v3.html'), html);
+for (const filename of ['OpenFOAM_v2412_case_builder_v3.html', 'OpenFOAM_v2412_case_builder_v8_1.html']) {
+  fs.writeFileSync(path.join(root, filename), html);
+}
