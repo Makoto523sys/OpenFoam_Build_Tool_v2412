@@ -1,0 +1,28 @@
+{
+  "name": "openfoam_build_tool_v2412",
+  "version": "7.0.0",
+  "description": "Offline STL workbench and OpenFOAM v2412 case generator",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Makoto523sys/OpenFoam_Build_Tool_v2412.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Makoto523sys/OpenFoam_Build_Tool_v2412/issues"
+  },
+  "homepage": "https://github.com/Makoto523sys/OpenFoam_Build_Tool_v2412#readme",
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}

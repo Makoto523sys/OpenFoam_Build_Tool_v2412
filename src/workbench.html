@@ -1,0 +1,37 @@
+<section class="panel workbench" id="workbench">
+  <div class="row"><h2>形状 → 面選択 → パッチ・境界条件</h2><div class="btns"><button id="saveProject" class="secondary">作業を保存</button><button id="loadProject" class="ghost">作業を開く</button><input id="projectPicker" type="file" accept=".json" hidden></div></div>
+  <div class="workspace-grid">
+    <div>
+      <div id="stlPickerSlot"></div>
+      <div class="btns"><button id="demoGeometry" class="light">内部ノズルの例を表示</button><button id="fitGeometry" class="ghost">全体表示</button><button id="viewX" class="ghost">Xから</button><button id="viewY" class="ghost">Yから</button><button id="viewZ" class="ghost">Zから</button><button id="viewIso" class="ghost">斜め</button></div>
+      <div class="viewport"><canvas id="stlCanvas" aria-label="STL 3Dビュー：クリックで面選択、ドラッグで回転、右ドラッグで移動、ホイールで拡大" tabindex="0"></canvas><svg id="viewAxes" viewBox="0 0 90 90" aria-label="座標軸"></svg><div class="view-help">クリック：選択 / Ctrl・Shift：追加選択 / ドラッグ：回転 / 右ドラッグ：移動 / ホイール：拡大</div></div>
+      <div class="btns"><button id="hideSelection" class="secondary">選択面を非表示</button><button id="isolateSelection" class="secondary">選択面だけ表示</button><button id="showAllFaces" class="ghost">すべて再表示</button><button id="clearSelection" class="ghost">選択解除</button><button id="undoGeometry" class="ghost">面操作を戻す</button></div>
+      <p class="hint">非表示の面も計算用STLに残ります。面を隠して内部の部品を選択できます。STLの面方向と閉鎖性は出力前に確認してください。</p>
+      <div id="geometryStatus" role="status" aria-live="polite" class="note">ASCII / binary STLを読み込むとここに表示します。データはブラウザ内で処理します。</div>
+      <div id="partList" class="part-list"></div>
+    </div>
+    <div>
+      <div class="grid2"><div><label for="stlScale">STL座標 → m</label><select id="stlScale"><option value="1">m（×1）</option><option value="0.001">mm（×0.001）</option><option value="0.01">cm（×0.01）</option><option value="0.0254">inch（×0.0254）</option></select></div><div><label for="selectionMode">面の選び方</label><select id="selectionMode"><option value="smooth">平面・近い法線の連続面</option><option value="triangle">三角形1枚</option><option value="component">接続する部品全体</option><option value="region">元のSTL solid全体</option><option value="patch">割り当て済みパッチ全体</option></select></div></div>
+      <label for="selectionAngle">連続面の法線角度 [°]</label><input id="selectionAngle" type="number" min="0" max="180" value="20">
+      <div id="selectionStatus" class="note">面を選択してください。</div>
+      <label for="visualPatchName">選択面のパッチ名</label><input id="visualPatchName" value="waterInlet" placeholder="waterInlet">
+      <label for="visualPurpose">境界の用途</label><select id="visualPurpose"></select>
+      <div class="grid2"><div><label for="visualU">速度 U [m/s]</label><input id="visualU" value="(1 0 0)"></div><div><label for="visualQ">体積流量 [m³/s]</label><input id="visualQ" type="number" step="any" value="0.001"></div><div><label for="visualMdot">質量流量 [kg/s]</label><input id="visualMdot" type="number" step="any" value="1"></div><div><label for="visualP">圧力（単位はソルバーに依存）</label><input id="visualP" type="number" step="any" value="0"></div><div><label for="visualT">温度 [K]</label><input id="visualT" type="number" step="any" value="293.15"></div><div><label for="visualAlpha">第1相（水）体積率 [0–1]</label><input id="visualAlpha" type="number" min="0" max="1" step="0.1" value="1"></div></div>
+      <button id="assignVisualPatch" class="green">選択面にパッチ・境界条件を割り当て</button>
+      <details><summary>領域と流れ方向</summary>
+        <div class="btns"><button id="fitDomain" class="light">STLから背景領域を設定</button><button id="flowX">流れ +X</button><button id="flowY">流れ +Y</button><button id="flowZ">流れ +Z</button></div>
+        <p class="hint">背景領域はSTL外接箱に余白20%を付けて設定します。内部流れでは、保持点を容器内の流体側に指定してください。</p>
+        <label for="fluidOffset">選択面中心からの距離 [m]（STL法線方向が正）</label><input id="fluidOffset" type="number" step="any" value="0.001"><button id="setFluidPoint" class="ghost">選択面からlocationInMeshを設定</button>
+      </details>
+      <details><summary>VOF初期水領域 [m]</summary><label for="waterBoxMin">水領域 最小座標</label><input id="waterBoxMin" value="(-1 -1 -1)"><label for="waterBoxMax">水領域 最大座標</label><input id="waterBoxMax" value="(0 1 1)"><p class="hint">箱内は第1相=1、箱外は0。setFieldsDictへ反映します。</p></details>
+    </div>
+  </div>
+</section>
+<section class="panel workbench" id="motionPanel">
+  <h2>メッシュ運動・適合細分化</h2>
+  <div class="grid3"><div><label for="meshMotion">方式</label><select id="meshMotion"><option value="static">固定メッシュ</option><option value="mrf">MRF：回転座標系（メッシュ固定）</option><option value="ami">AMI：円筒内のメッシュを回転</option><option value="rigid">領域全体を剛体回転</option><option value="refine">VOF界面に合わせて自動細分化</option></select></div><div><label for="rotationOrigin">回転中心 [m]</label><input id="rotationOrigin" value="(0 0 0)"></div><div><label for="rotationAxis">回転軸（方向ベクトル）</label><input id="rotationAxis" value="(0 0 1)"></div></div>
+  <div id="rotationControls" class="grid4"><div><label for="rotationRPM">回転速度 [rpm]</label><input id="rotationRPM" type="number" step="any" value="60"></div><div><label for="rotorRadius">回転円筒 半径 [m]</label><input id="rotorRadius" type="number" step="any" value="0.25"></div><div><label for="rotorLength">回転円筒 長さ [m]</label><input id="rotorLength" type="number" step="any" value="0.5"></div><div><label for="rotorLevel">AMI面の細分化レベル</label><input id="rotorLevel" type="number" min="0" max="8" value="3"></div></div>
+  <label for="nonRotatingPatches">MRF領域に接する静止パッチ（空白区切り）</label><input id="nonRotatingPatches" value="inlet outlet walls">
+  <div id="refineControls" class="grid4"><div><label for="refineInterval">細分化間隔 [step]</label><input id="refineInterval" type="number" min="1" value="1"></div><div><label for="refineMax">最大追加レベル</label><input id="refineMax" type="number" min="1" max="8" value="2"></div><div><label for="refineCells">最大セル数</label><input id="refineCells" type="number" min="1" value="2000000"></div><div><label for="refineLower">界面判定下限（上限=1−下限）</label><input id="refineLower" type="number" min="0" max="0.49" step="0.001" value="0.001"></div></div>
+  <div id="motionStatus" class="note" role="status"></div>
+</section>
