@@ -1,14 +1,16 @@
 /* Dependency-free WebGL viewer, orthographic projection and depth-aware picking. */
 class STLViewer {
-  constructor(canvas,onPick) {
+  constructor(canvas,onPick,options={}) {
+    this.compassId=options.compassId||'viewAxes';
     this.canvas=canvas;this.onPick=onPick;this.faces=[];this.yaw=-0.65;this.pitch=0.45;this.zoom=1;this.pan=[0,0];
     this.gl=canvas.getContext('webgl',{antialias:true,preserveDrawingBuffer:true});
-    if(!this.gl){canvas.replaceWith(Object.assign(document.createElement('p'),{textContent:'WebGLを利用できません。ブラウザのハードウェアアクセラレーションを有効にしてください。面リストからの操作は利用できます。'}));return;}
+    if(!this.gl){canvas.replaceWith(Object.assign(document.createElement('p'),{textContent:'WebGLを利用できません。3D表示にはブラウザのハードウェアアクセラレーションを有効にしてください。ファイルの読み込み・辞書生成は利用できます。'}));return;}
     const gl=this.gl;
     const shader=(type,code)=>{const s=gl.createShader(type);gl.shaderSource(s,code);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
     const p=gl.createProgram();gl.attachShader(p,shader(gl.VERTEX_SHADER,'attribute vec3 pos; attribute vec4 color; uniform mat4 matrix; varying vec4 c; void main(){gl_Position=matrix*vec4(pos,1.0);c=color;}'));gl.attachShader(p,shader(gl.FRAGMENT_SHADER,'precision mediump float; varying vec4 c; void main(){if(c.a<0.5)discard;gl_FragColor=c;}'));gl.linkProgram(p);
     if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));
     this.program=p;this.pb=gl.createBuffer();this.cb=gl.createBuffer();this.gb=gl.createBuffer();this.pos=gl.getAttribLocation(p,'pos');this.col=gl.getAttribLocation(p,'color');this.mat=gl.getUniformLocation(p,'matrix');
+    canvas.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')this.yaw-=.1;else if(e.key==='ArrowRight')this.yaw+=.1;else if(e.key==='ArrowUp')this.pitch-=.1;else if(e.key==='ArrowDown')this.pitch+=.1;else if(['+','='].includes(e.key))this.zoom=Math.min(100,this.zoom*1.15);else if(e.key==='-')this.zoom=Math.max(.05,this.zoom/1.15);else if(e.key==='Home'){this.setFaces(this.faces,true);}else return;e.preventDefault();this.draw();});
     canvas.addEventListener('contextmenu',e=>e.preventDefault());
     canvas.addEventListener('pointerdown',e=>{this.drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,button:e.button};canvas.setPointerCapture(e.pointerId);});
     canvas.addEventListener('pointermove',e=>{if(!this.drag)return;const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.x=e.clientX;this.drag.y=e.clientY;if(this.drag.button===2){this.pan[0]+=2*dx/canvas.clientWidth;this.pan[1]-=2*dy/canvas.clientHeight;}else{this.yaw+=dx*.008;this.pitch+=dy*.008;}this.draw();});
@@ -35,17 +37,17 @@ class STLViewer {
   }
   matrix() {
     const cy=Math.cos(this.yaw),sy=Math.sin(this.yaw),cp=Math.cos(this.pitch),sp=Math.sin(this.pitch),c=this.center||[0,0,0],r=this.radius||1;
-    const aspect=this.canvas.clientWidth/Math.max(1,this.canvas.clientHeight),s=.85*this.zoom/r;
+    const aspect=Math.max(1,this.canvas.clientWidth)/Math.max(1,this.canvas.clientHeight),s=.85*this.zoom/r;
     const a=[cy,0,sy],b=[sp*sy,cp,-sp*cy],z=[-cp*sy,sp,cp*cy];
     return new Float32Array([a[0]*s/aspect,b[0]*s,-z[0]/(r*4),0,a[1]*s/aspect,b[1]*s,-z[1]/(r*4),0,a[2]*s/aspect,b[2]*s,-z[2]/(r*4),0,-Geometry.dot(a,c)*s/aspect+this.pan[0],-Geometry.dot(b,c)*s+this.pan[1],Geometry.dot(z,c)/(r*4),1]);
   }
   project(v,m=this.matrix()){return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12],m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13],m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]];}
   draw() {
-    if(!this.gl)return;const gl=this.gl,canvas=this.canvas,dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(canvas.clientWidth*dpr));canvas.height=Math.max(1,Math.round(canvas.clientHeight*dpr));
+    if(!this.gl||!this.canvas.clientWidth||!this.canvas.clientHeight)return;const gl=this.gl,canvas=this.canvas,dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(canvas.clientWidth*dpr));canvas.height=Math.max(1,Math.round(canvas.clientHeight*dpr));
     gl.viewport(0,0,canvas.width,canvas.height);gl.clearColor(.045,.075,.12,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.uniformMatrix4fv(this.mat,false,this.matrix());
     gl.bindBuffer(gl.ARRAY_BUFFER,this.pb);gl.enableVertexAttribArray(this.pos);gl.vertexAttribPointer(this.pos,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ARRAY_BUFFER,this.cb);gl.enableVertexAttribArray(this.col);gl.vertexAttribPointer(this.col,4,gl.FLOAT,false,0,0);gl.drawArrays(gl.TRIANGLES,0,this.faces.length*3);
     if(this.guideCount){gl.bindBuffer(gl.ARRAY_BUFFER,this.gb);gl.vertexAttribPointer(this.pos,3,gl.FLOAT,false,0,0);gl.disableVertexAttribArray(this.col);gl.vertexAttrib4f(this.col,.1,.9,.85,1);gl.drawArrays(gl.LINES,0,this.guideCount);}
-    const compass=document.getElementById('viewAxes');if(compass){const m=this.matrix(),aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight),s=.85*this.zoom/(this.radius||1);compass.replaceChildren();for(let i=0;i<3;i++){const x=45+32*m[i*4]*aspect/s,y=45-32*m[i*4+1]/s,line=document.createElementNS('http://www.w3.org/2000/svg','line'),text=document.createElementNS('http://www.w3.org/2000/svg','text');for(const [k,v] of Object.entries({x1:45,y1:45,x2:x,y2:y,stroke:['#f87171','#4ade80','#60a5fa'][i],'stroke-width':2}))line.setAttribute(k,v);text.setAttribute('x',x+3);text.setAttribute('y',y-3);text.setAttribute('fill',['#f87171','#4ade80','#60a5fa'][i]);text.textContent=['X','Y','Z'][i];compass.append(line,text);}}
+    const compass=document.getElementById(this.compassId);if(compass){const m=this.matrix(),aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight),s=.85*this.zoom/(this.radius||1);compass.replaceChildren();for(let i=0;i<3;i++){const x=45+32*m[i*4]*aspect/s,y=45-32*m[i*4+1]/s,line=document.createElementNS('http://www.w3.org/2000/svg','line'),text=document.createElementNS('http://www.w3.org/2000/svg','text');for(const [k,v] of Object.entries({x1:45,y1:45,x2:x,y2:y,stroke:['#f87171','#4ade80','#60a5fa'][i],'stroke-width':2}))line.setAttribute(k,v);text.setAttribute('x',x+3);text.setAttribute('y',y-3);text.setAttribute('fill',['#f87171','#4ade80','#60a5fa'][i]);text.textContent=['X','Y','Z'][i];compass.append(line,text);}}
   }
   view(axis) {this.pan=[0,0];this.zoom=1;const angles={x:[-Math.PI/2,0],y:[0,Math.PI/2],z:[0,0],iso:[-.65,.45]};[this.yaw,this.pitch]=angles[axis];this.draw();}
   pick(x,y,add) {

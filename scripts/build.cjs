@@ -3,7 +3,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 let html = fs.readFileSync(path.join(root, 'src/template.html'), 'utf8');
 html = html.replace('<!-- BUILD:workbench -->', () => fs.readFileSync(path.join(root, 'src/workbench.html'), 'utf8'));
-for (const name of ['geometry', 'viewer', 'workbench']) {
+for (const name of ['geometry', 'viewer', 'acceleration', 'water-region', 'workbench', 'inputs-ui']) {
   const code = fs.readFileSync(path.join(root, `src/${name}.js`), 'utf8');
   html = html.replace(`/* BUILD:${name} */`, () => code);
 }

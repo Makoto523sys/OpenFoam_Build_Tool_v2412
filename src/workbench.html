@@ -4,7 +4,7 @@
     <div>
       <div id="stlPickerSlot"></div>
       <div class="btns"><button id="demoGeometry" class="light">内部ノズルの例を表示</button><button id="fitGeometry" class="ghost">全体表示</button><button id="viewX" class="ghost">Xから</button><button id="viewY" class="ghost">Yから</button><button id="viewZ" class="ghost">Zから</button><button id="viewIso" class="ghost">斜め</button></div>
-      <div class="viewport"><canvas id="stlCanvas" aria-label="STL 3Dビュー：クリックで面選択、ドラッグで回転、右ドラッグで移動、ホイールで拡大" tabindex="0"></canvas><svg id="viewAxes" viewBox="0 0 90 90" aria-label="座標軸"></svg><div class="view-help">クリック：選択 / Ctrl・Shift：追加選択 / ドラッグ：回転 / 右ドラッグ：移動 / ホイール：拡大</div></div>
+      <div class="viewport"><canvas id="stlCanvas" aria-label="STL 3Dビュー：クリックで面選択、ドラッグで回転、右ドラッグで移動、ホイールで拡大。キーボード：矢印で回転、+/-で拡大縮小、Homeで全体表示" tabindex="0"></canvas><svg id="viewAxes" viewBox="0 0 90 90" aria-label="座標軸"></svg><div class="view-help">クリック：選択 / Ctrl・Shift：追加選択 / ドラッグ：回転 / 右ドラッグ：移動 / ホイール：拡大</div></div>
       <div class="btns"><button id="hideSelection" class="secondary">選択面を非表示</button><button id="isolateSelection" class="secondary">選択面だけ表示</button><button id="showAllFaces" class="ghost">すべて再表示</button><button id="clearSelection" class="ghost">選択解除</button><button id="undoGeometry" class="ghost">面操作を戻す</button></div>
       <p class="hint">非表示の面も計算用STLに残ります。面を隠して内部の部品を選択できます。STLの面方向と閉鎖性は出力前に確認してください。</p>
       <div id="geometryStatus" role="status" aria-live="polite" class="note">ASCII / binary STLを読み込むとここに表示します。データはブラウザ内で処理します。</div>
@@ -23,9 +23,34 @@
         <p class="hint">背景領域はSTL外接箱に余白20%を付けて設定します。内部流れでは、保持点を容器内の流体側に指定してください。</p>
         <label for="fluidOffset">選択面中心からの距離 [m]（STL法線方向が正）</label><input id="fluidOffset" type="number" step="any" value="0.001"><button id="setFluidPoint" class="ghost">選択面からlocationInMeshを設定</button>
       </details>
-      <details><summary>VOF初期水領域 [m]</summary><label for="waterBoxMin">水領域 最小座標</label><input id="waterBoxMin" value="(-1 -1 -1)"><label for="waterBoxMax">水領域 最大座標</label><input id="waterBoxMax" value="(0 1 1)"><p class="hint">箱内は第1相=1、箱外は0。setFieldsDictへ反映します。</p></details>
+      <p class="hint"><a href="#initialWaterPanel">初期水領域（ボックス / 専用STL）</a>・<a href="#accelerationPanel">加速度CSV</a>は下の専用欄で設定します。</p>
     </div>
   </div>
+</section>
+<section class="panel workbench" id="initialWaterPanel">
+  <h2>VOFの初期水領域</h2>
+  <p class="hint">領域内を alpha.water = 1、領域外を 0 で初期化します。初期水領域STLは水の占める体積を表す専用データです。メッシュ生成用STL・壁面・境界パッチには追加されません。</p>
+  <label for="waterRegionMode">領域の指定方法</label><select id="waterRegionMode"><option value="box">ボックス：対角の2点を指定</option><option value="stl">STL：閉じた形状の内側を指定</option></select>
+  <div id="waterBoxControls" class="grid2"><div><label for="waterBoxMin">水領域 最小座標 [m]</label><input id="waterBoxMin" value="(-1 -1 -1)"></div><div><label for="waterBoxMax">水領域 最大座標 [m]</label><input id="waterBoxMax" value="(0 1 1)"></div></div>
+  <div id="waterSTLControls" hidden>
+    <div class="grid2"><div><label for="waterRegionPicker">初期水領域専用STL（1ファイル）</label><input id="waterRegionPicker" type="file" accept=".stl" aria-describedby="waterSTLHelp"></div><div><label for="waterRegionScale">初期水領域STLの座標単位 → m</label><select id="waterRegionScale"><option value="1">m（×1）</option><option value="0.001">mm（×0.001）</option><option value="0.01">cm（×0.01）</option><option value="0.0254">inch（×0.0254）</option></select></div></div>
+    <p class="hint" id="waterSTLHelp">メッシュと同じ座標系・原点で用意してください。1つにつながった、外向きの閉曲面に対応します。セル中心が内側にあるセルを選ぶため、界面を横切るセルの体積率は積分しません。</p>
+    <div class="btns"><button id="fitWaterRegion" class="ghost">初期水領域を全体表示</button><button id="clearWaterRegion" class="secondary">初期水領域STLを解除</button></div>
+    <div class="viewport water-viewport"><canvas id="waterRegionCanvas" tabindex="0" aria-label="初期水領域専用3Dビュー：ドラッグで回転、右ドラッグで移動、ホイールで拡大。キーボード：矢印で回転、+/-で拡大縮小、Homeで全体表示"></canvas><svg id="waterAxes" viewBox="0 0 90 90" aria-label="初期水領域の座標軸"></svg><div class="view-help">初期水領域のみ表示 / 座標は読み込み元のSTL基準</div></div>
+  </div>
+  <div id="waterRegionStatus" class="note" role="status" aria-live="polite"></div>
+</section>
+<section class="panel workbench" id="accelerationPanel">
+  <h2>スロッシング：容器の入力加速度</h2>
+  <label class="inlineCheck" for="enableAcceleration"><input id="enableAcceleration" type="checkbox">時刻歴CSVによる並進加速度を有効にする</label>
+  <p class="hint" id="accelerationHelp">interFoam / interIsoFoam ＋ 固定メッシュに対応。回転しない容器に固定した座標系で解き、重力 g に対し g − 入力加速度 が作用します。CSVには重力を含めず、容器の加速度の符号をそのまま入力してください。</p>
+  <div id="accelerationControls" hidden>
+    <div class="grid2"><div><label for="accelerationPicker">CSV：時間、X加速度、Y加速度、Z加速度</label><input id="accelerationPicker" type="file" accept=".csv,text/csv" aria-describedby="accelerationFormat"></div><div><label for="accelerationUnit">CSVの加速度単位（時間は秒）</label><select id="accelerationUnit"><option value="m/s2">m/s²</option><option value="Gal">Gal（cm/s² → ×0.01）</option><option value="g">g（標準重力 → ×9.80665）</option></select></div></div>
+    <p class="hint" id="accelerationFormat">カンマ区切り4列。見出し time,ax,ay,az は省略できます。時刻は0以上・昇順・重複なし。解析開始〜終了を含み、終端に最大時間刻み1回分（adjustableRunTimeでは2回分）の余裕を持つデータが必要です。可変時間刻みではcontrolDictのmaxDeltaTを正の値にしてください。下のボタンで余裕を残した解析時間を設定できます。</p>
+    <div class="btns"><button id="downloadAccelerationExample" class="light">CSVひな形を保存</button><button id="applyAccelerationTimeRange" class="ghost">CSV範囲に解析時間を合わせる</button><button id="clearAcceleration" class="secondary">CSVを解除</button></div>
+    <div id="accelerationPreview" hidden><svg id="accelerationPlot" viewBox="0 0 760 230" role="img" aria-label="入力加速度の時刻歴。Xは赤、Yは緑、Zは青。表示は入力点を結ぶ線。"></svg><p class="hint">赤実線：X、緑破線：Y、青点線：Z。表示は入力点の折れ線（SI単位）です。OpenFOAM v2412は実計算でスプライン補間するため、点間で入力値を超える場合があります。範囲外への外挿はできません。</p></div>
+  </div>
+  <div id="accelerationStatus" class="note" role="status" aria-live="polite"></div>
 </section>
 <section class="panel workbench" id="motionPanel">
   <h2>メッシュ運動・適合細分化</h2>
