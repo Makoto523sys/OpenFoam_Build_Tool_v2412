@@ -20,7 +20,7 @@ function fluxPatchNames(){
 }
 function renamePatchReferences(oldName,newName){
   if(oldName===newName)return;
-  for(const id of ['foSFVPatch','foForcePatches','nonRotatingPatches'])$(id).value=listWords(val(id)).map(n=>n===oldName?newName:n).join(' ');
+  for(const id of ['foSFVPatch','foForcePatches','nonRotatingPatches','foWallSamplePatches'])$(id).value=listWords(val(id)).map(n=>n===oldName?newName:n).join(' ');
 }
 function layerTotals(n){
   const final=Number(val('finalLayerThickness')),r=Number(val('layerExpansionRatio'));
@@ -92,6 +92,7 @@ function caseInputErrors(c=cfg()){
   // explicit STL inlet/zero-gradient-outlet combination separately from the box.
   if(!checked('includeSnappy'))errors.push(...boundaryCombinationErrors(c.patches,c));
   else {const names=new Set(allFaces().map(f=>f.patch)),stl=c.patches.filter(p=>names.has(p.name));if(!c.patches.some(p=>pressurePurposes.has(p.purpose))&&stl.some(p=>p.purpose==='outletZeroGradient'||p.purpose==='inletOutlet'))errors.push(...boundaryCombinationErrors(stl,c));}
+  errors.push(...vofObservationErrors(c));
   return [...new Set(errors)];
 }
 function caseInputWarnings(c=cfg()){
@@ -109,7 +110,7 @@ function flowMonitorText(names){
 }
 function runtimeCheckFiles(c,fields){
   const sources=patchSources(),names=fluxPatchNames();
-  const config={version:1,solver:c.solver.id,compressible:c.compressible,rho:num('rho'),pressure:c.pMode==='p_rgh'?'p_rgh':'p',fields:fields.map(k=>allFieldTemplates[k].object),patches:c.patches.map(p=>({...p,sources:sources.get(p.name)||[{kind:'existing',label:'既存/手動',active:true}],inletFlow:specifiedInletFlow(p)})),flow:{enabled:checked('foSurfaceFieldValue'),mode:val('foSFVMode'),names,field:val('foSFVField'),operation:val('foSFVOperation'),writeControl:val('foBasicWriteControl'),writeInterval:Number(val('foSFVInterval'))},forcePatches:checked('foForces')||checked('foForceCoeffs')?listWords(val('foForcePatches')):[],residualFields:checked('foResiduals')?residualFieldNames(c):[]};
+  const config={version:1,wallSamplePatches:checked('foWallSamples')?listWords(val('foWallSamplePatches')):[],solver:c.solver.id,compressible:c.compressible,rho:num('rho'),pressure:c.pMode==='p_rgh'?'p_rgh':'p',fields:fields.map(k=>allFieldTemplates[k].object),patches:c.patches.map(p=>({...p,sources:sources.get(p.name)||[{kind:'existing',label:'既存/手動',active:true}],inletFlow:specifiedInletFlow(p)})),flow:{enabled:checked('foSurfaceFieldValue'),mode:val('foSFVMode'),names,field:val('foSFVField'),operation:val('foSFVOperation'),writeControl:val('foBasicWriteControl'),writeInterval:Number(val('foSFVInterval'))},forcePatches:checked('foForces')||checked('foForceCoeffs')?listWords(val('foForcePatches')):[],residualFields:checked('foResiduals')?residualFieldNames(c):[]};
   return [{path:c.caseName+'/scripts/validate_case.py',text:runtimeCheckScript},{path:c.caseName+'/system/caseBuilderChecks.json',text:JSON.stringify(config,null,2)+'\n'},{path:c.caseName+'/system/flowMonitors',text:flowMonitorText(names)}];
 }
 function updateCaseChecksUI(){
@@ -132,7 +133,52 @@ function updateCaseChecksUI(){
 }
 function caseCheckDefaults(data){
   const inputs=data.inputs||{},legacyFields='p p_rgh U T k epsilon omega alpha.water';
-  return {initialU:'(0 0 0)',foResidualMode:!inputs.foResidualFields||inputs.foResidualFields===legacyFields?'auto':'manual',foSFVMode:inputs.foSFVPatch?'manual':'auto',layerRelativeSizes:'true',layerMinThickness:'0.05',layerExpansionRatio:'1.2',nCellsBetweenLevels:'3',snapTolerance:'2',snapSolveIter:'30',...inputs};
+  return {foInterfaceHeight:false,foWallSamples:false,foHeightLocations:'(0.005 0.007 0.025)',foHeightDirection:'(0 0 -1)',foHeightInterval:'0.01',foWallSamplePatches:'',initialU:'(0 0 0)',foResidualMode:!inputs.foResidualFields||inputs.foResidualFields===legacyFields?'auto':'manual',foSFVMode:inputs.foSFVPatch?'manual':'auto',layerRelativeSizes:'true',layerMinThickness:'0.05',layerExpansionRatio:'1.2',nCellsBetweenLevels:'3',snapTolerance:'2',snapSolveIter:'30',...inputs};
+}
+function vofObservationErrors(c){
+  const errors=[];
+  if((checked('foInterfaceHeight')||checked('foWallSamples'))&&!c.vof)errors.push('波高・壁面分布の観測はVOFソルバー用です。');
+  if(checked('foInterfaceHeight')){
+    const points=val('foHeightLocations').split(/\n/).map(s=>s.trim()).filter(Boolean);
+    if(!points.length||points.some(s=>!strictVector(s)))errors.push('波高測点は1行に1つの有限な (x y z) 座標です。');
+    if(!strictVector(val('foHeightDirection'))||!magVector(val('foHeightDirection')))errors.push('波高の計測方向はゼロでない有限なベクトルです。');
+    if(!Number.isFinite(num('foHeightInterval'))||num('foHeightInterval')<=0)errors.push('波高出力間隔は正の有限値です。');
+  }
+  if(checked('foWallSamples')){
+    const names=listWords(val('foWallSamplePatches'));if(!names.length)errors.push('壁面分布の対象パッチを指定してください。');
+    for(const n of names){const p=c.patches.find(p=>p.name===n);if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(n)||!p||purposeType(p.purpose)!=='wall')errors.push('壁面分布の対象は登録した壁パッチにしてください: '+n);}
+  }
+  return errors;
+}
+function vofObservationObjects(c){
+  const out=[];
+  if(checked('foInterfaceHeight'))out.push(`cornerHeights
+{
+    type interfaceHeight;
+    libs (fieldFunctionObjects);
+    alpha alpha.water;
+    liquid true;
+    direction ${val('foHeightDirection')};
+    locations (${val('foHeightLocations').split(/\n/).filter(s=>s.trim()).join(' ')});
+    interpolationScheme cellPoint;
+    writeControl runTime;
+    writeInterval ${val('foHeightInterval')};
+    log false;
+}`);
+  if(checked('foWallSamples'))out.push(`wallSamples
+{
+    type surfaces;
+    libs (sampling);
+    writeControl writeTime;
+    surfaceFormat vtk;
+    interpolationScheme cellPoint;
+    fields (wallShearStress rho alpha.water);
+    surfaces
+    (
+${[...new Set(listWords(val('foWallSamplePatches')))].map(n=>`        ${n} { type patch; patches (${n}); interpolate false; }`).join('\n')}
+    );
+}`);
+  return out;
 }
 function initCaseChecksUI(){
   for(const def of blockMeshFaceDefs())$('bm'+def.key+'Name').addEventListener('input',event=>{

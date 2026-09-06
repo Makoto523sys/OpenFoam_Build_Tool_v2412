@@ -335,6 +335,9 @@ def validate(case):
         errors.extend(found_errors)
         notes.extend(found_notes)
         report["flowPatches"] = names
+        for name in config.get("wallSamplePatches", []):
+            if name not in active or active[name]["type"] != "wall":
+                errors.append("Wall sampling requires a nonempty wall patch: " + name)
         for pattern in config["forcePatches"]:
             try:
                 matched = any(re.fullmatch(pattern, n) for n in active)

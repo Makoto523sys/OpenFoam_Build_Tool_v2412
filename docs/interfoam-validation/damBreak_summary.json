@@ -1,0 +1,141 @@
+{
+  "damBreak_coarse": {
+    "lastTime": 1.0,
+    "ended": true,
+    "initialCells": 3200,
+    "initialWaterCells": 400,
+    "initialWaterVolume_m3": 0.0006224272,
+    "finalWaterVolume_m3": 0.00060402554549,
+    "waterChange_percent": -2.9564348264343288,
+    "alphaMin": -1.072012439e-29,
+    "alphaMax": 1.000000184,
+    "heightRows": 100,
+    "heightMin_m": [
+      0.022561697912,
+      4.1017703426e-82
+    ],
+    "heightMax_m": [
+      0.29145891809,
+      0.42253989819
+    ],
+    "warnings": 0,
+    "fatal": 0,
+    "maxCellsDuringAdaptation": 3200,
+    "finalCells": 3200,
+    "refinementEvents": 0,
+    "unrefinementEvents": 0
+  },
+  "damBreak_stl": {
+    "lastTime": 1.0,
+    "ended": true,
+    "initialCells": 6400,
+    "initialWaterCells": 800,
+    "initialWaterVolume_m3": 0.0006224272,
+    "finalWaterVolume_m3": 0.00060343007314,
+    "waterChange_percent": -3.052104223594343,
+    "alphaMin": -3.061147164e-19,
+    "alphaMax": 1.000001177,
+    "heightRows": 100,
+    "heightMin_m": [
+      0.022754840386,
+      5.3479717845e-147
+    ],
+    "heightMax_m": [
+      0.29147136869,
+      0.42029685469
+    ],
+    "warnings": 0,
+    "fatal": 0,
+    "maxCellsDuringAdaptation": 6400,
+    "finalCells": 6400,
+    "refinementEvents": 0,
+    "unrefinementEvents": 0
+  },
+  "damBreak_amr": {
+    "lastTime": 1.0,
+    "ended": true,
+    "initialCells": 3200,
+    "initialWaterCells": 400,
+    "initialWaterVolume_m3": 0.0006224272,
+    "finalWaterVolume_m3": 0.00060315158232,
+    "waterChange_percent": -3.096846937280384,
+    "alphaMin": -2.626871354e-23,
+    "alphaMax": 1.000000848,
+    "heightRows": 100,
+    "heightMin_m": [
+      0.022496750274,
+      5.9294106461e-85
+    ],
+    "heightMax_m": [
+      0.2914742525,
+      0.41435472928
+    ],
+    "warnings": 0,
+    "fatal": 0,
+    "maxCellsDuringAdaptation": 8072,
+    "finalCells": 7953,
+    "refinementEvents": 479,
+    "unrefinementEvents": 247
+  },
+  "damBreak_amr_level2": {
+    "lastTime": 1.0,
+    "ended": true,
+    "initialCells": 3200,
+    "initialWaterCells": 400,
+    "initialWaterVolume_m3": 0.0006224272,
+    "finalWaterVolume_m3": 0.00060188245512,
+    "waterChange_percent": -3.3007466383217166,
+    "alphaMin": -4.141826818e-21,
+    "alphaMax": 1.000003048,
+    "heightRows": 100,
+    "heightMin_m": [
+      0.016925069353,
+      2.4554485724e-88
+    ],
+    "heightMax_m": [
+      0.29150161948,
+      0.3914321333
+    ],
+    "warnings": 0,
+    "fatal": 0,
+    "maxCellsDuringAdaptation": 37703,
+    "finalCells": 37570,
+    "refinementEvents": 1176,
+    "unrefinementEvents": 838
+  },
+  "level2Snapshots": [
+    {
+      "time": 0.1,
+      "cells": 11530,
+      "levels": {
+        "0": 2986,
+        "1": 736,
+        "2": 7808
+      },
+      "mixedCells": 3800,
+      "mixedCellsAtMaxLevel_percent": 100.0
+    },
+    {
+      "time": 0.5,
+      "cells": 20273,
+      "levels": {
+        "0": 2740,
+        "1": 1701,
+        "2": 15832
+      },
+      "mixedCells": 9058,
+      "mixedCellsAtMaxLevel_percent": 100.0
+    },
+    {
+      "time": 1,
+      "cells": 37570,
+      "levels": {
+        "0": 2405,
+        "1": 2245,
+        "2": 32920
+      },
+      "mixedCells": 15792,
+      "mixedCellsAtMaxLevel_percent": 100.0
+    }
+  ]
+}

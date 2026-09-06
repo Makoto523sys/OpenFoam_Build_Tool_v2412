@@ -1,0 +1,541 @@
+{
+  "format": "OpenFOAM-Case-Builder",
+  "version": 3,
+  "auxiliary": {
+    "acceleration": null,
+    "accelerationError": "",
+    "water": {
+      "fileName": "damBreak_coarse_initial_water.stl",
+      "faces": [
+        {
+          "v": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0.0146,
+              0
+            ],
+            [
+              0.1461,
+              0.0146,
+              0
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.1461,
+              0.0146,
+              0
+            ],
+            [
+              0.1461,
+              0,
+              0
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0,
+              0,
+              0.292
+            ],
+            [
+              0.1461,
+              0,
+              0.292
+            ],
+            [
+              0.1461,
+              0.0146,
+              0.292
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0,
+              0,
+              0.292
+            ],
+            [
+              0.1461,
+              0.0146,
+              0.292
+            ],
+            [
+              0,
+              0.0146,
+              0.292
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.1461,
+              0,
+              0
+            ],
+            [
+              0.1461,
+              0,
+              0.292
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0.1461,
+              0,
+              0.292
+            ],
+            [
+              0,
+              0,
+              0.292
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0,
+              0.0146,
+              0
+            ],
+            [
+              0,
+              0.0146,
+              0.292
+            ],
+            [
+              0.1461,
+              0.0146,
+              0.292
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0,
+              0.0146,
+              0
+            ],
+            [
+              0.1461,
+              0.0146,
+              0.292
+            ],
+            [
+              0.1461,
+              0.0146,
+              0
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0.292
+            ],
+            [
+              0,
+              0.0146,
+              0.292
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0.0146,
+              0.292
+            ],
+            [
+              0,
+              0.0146,
+              0
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0.1461,
+              0,
+              0
+            ],
+            [
+              0.1461,
+              0.0146,
+              0
+            ],
+            [
+              0.1461,
+              0.0146,
+              0.292
+            ]
+          ],
+          "region": "initialWater"
+        },
+        {
+          "v": [
+            [
+              0.1461,
+              0,
+              0
+            ],
+            [
+              0.1461,
+              0.0146,
+              0.292
+            ],
+            [
+              0.1461,
+              0,
+              0.292
+            ]
+          ],
+          "region": "initialWater"
+        }
+      ]
+    },
+    "waterError": ""
+  },
+  "inputs": {
+    "viewRotateX": "0",
+    "viewRotateY": "0",
+    "viewRotateZ": "0",
+    "showBackgroundMesh": true,
+    "domainMarginPercent": "20",
+    "locationInMesh": "(0 0 0)",
+    "stlScale": "1",
+    "selectionMode": "smooth",
+    "selectionAngle": "20",
+    "visualPatchName": "waterInlet",
+    "visualPurpose": "velocityInlet",
+    "visualU": "(1 0 0)",
+    "visualQ": "0.001",
+    "visualMdot": "1",
+    "visualP": "0",
+    "visualT": "293.15",
+    "visualAlpha": "1",
+    "fluidOffset": "0.001",
+    "waterRegionMode": "stl",
+    "waterBoxMin": "(-1 -1 -1)",
+    "waterBoxMax": "(0 1 1)",
+    "waterRegionScale": "1",
+    "enableAcceleration": false,
+    "accelerationConvention": "container",
+    "accelerationTail": "none",
+    "accelerationTailStep": "0.01",
+    "accelerationSource": "csv",
+    "accelerationUnit": "m/s2",
+    "waveStartTime": "0",
+    "waveEndTime": "10",
+    "waveSampleInterval": "0.01",
+    "waveUnit": "m/s2",
+    "waveXKind": "sine",
+    "waveXAmplitude": "1",
+    "waveXCycleMode": "period",
+    "waveXCycle": "1",
+    "waveXPhase": "0",
+    "waveXOffset": "0",
+    "waveXExpression": "b + A*sin(2*pi*f*tau + phi)",
+    "waveYKind": "zero",
+    "waveYAmplitude": "1",
+    "waveYCycleMode": "period",
+    "waveYCycle": "1",
+    "waveYPhase": "0",
+    "waveYOffset": "0",
+    "waveYExpression": "b + A*sin(2*pi*f*tau + phi)",
+    "waveZKind": "zero",
+    "waveZAmplitude": "1",
+    "waveZCycleMode": "period",
+    "waveZCycle": "1",
+    "waveZPhase": "0",
+    "waveZOffset": "0",
+    "waveZExpression": "b + A*sin(2*pi*f*tau + phi)",
+    "meshMotion": "static",
+    "rotationOrigin": "(0 0 0)",
+    "rotationAxis": "(0 0 1)",
+    "rotationRPM": "60",
+    "rotorRadius": "0.25",
+    "rotorLength": "0.5",
+    "rotorLevel": "3",
+    "nonRotatingPatches": "leftWall rightWall atmosphere",
+    "refineInterval": "5",
+    "refineMax": "1",
+    "refineCells": "100000",
+    "refineLower": "0.001",
+    "caseName": "damBreak_coarse",
+    "wslPath": "~/OpenFOAM/$USER-v2412/run",
+    "caseMemo": "目的: MVPとしてまず流す。RANSで境界条件と保存則を確認し、必要に応じてLES/DESへ高忠実化する。",
+    "solver": "interFoam",
+    "physicsMode": "vof",
+    "timeMode": "transient",
+    "pressureMode": "p_rgh",
+    "heat": "off",
+    "turbulenceType": "laminar",
+    "rasModel": "kOmegaSST",
+    "lesModel": "Smagorinsky",
+    "nutWallFunction": "nutkWallFunction",
+    "turbI": "5",
+    "turbL": "0.01",
+    "material": "water20",
+    "material2": "air20",
+    "rho": "998.2",
+    "nu": "0.000001004",
+    "mu": "0.001002",
+    "sigma": "0.072",
+    "Cp": "4182",
+    "kappa": "0.598",
+    "Pr": "7",
+    "Prt": "0.85",
+    "beta": "0.00021",
+    "TRef": "293.15",
+    "gVec": "(0 0 -9.81)",
+    "startFrom": "startTime",
+    "startTime": "0",
+    "stopAt": "endTime",
+    "endTime": "1",
+    "deltaT": "0.0001",
+    "writeControl": "adjustableRunTime",
+    "writeInterval": "0.05",
+    "purgeWrite": "0",
+    "writeFormat": "ascii",
+    "writePrecision": "10",
+    "timeFormat": "general",
+    "timePrecision": "6",
+    "runTimeModifiable": "yes",
+    "writeCompression": "off",
+    "adjustTimeStep": "yes",
+    "maxCo": "0.3",
+    "maxAlphaCo": "0.15",
+    "maxDeltaT": "0.002",
+    "initialU": "(0 0 0)",
+    "foInterfaceHeight": true,
+    "foHeightLocations": "(0.01 0.0073 0.000001)\n(0.57 0.0073 0.000001)",
+    "foHeightDirection": "(0 0 -1)",
+    "foHeightInterval": "0.01",
+    "foWallSamples": false,
+    "foWallSamplePatches": "shortWall_x0 shortWall_xL",
+    "foResiduals": true,
+    "foResidualMode": "auto",
+    "foResidualFields": "p_rgh U",
+    "foCourant": true,
+    "foBasicWriteControl": "runTime",
+    "foYPlus": false,
+    "foBasicWriteInterval": "0.01",
+    "foWallShear": false,
+    "foWallHeatFlux": false,
+    "foVorticity": false,
+    "foQ": false,
+    "foForces": false,
+    "foForceCoeffs": false,
+    "foForcePatches": "atmosphere",
+    "foRhoInf": "998.2",
+    "foCofR": "(0 0 0)",
+    "foMagUInf": "1",
+    "foLRef": "1",
+    "foAref": "1",
+    "foCoeffDirs": "drag=(1 0 0); lift=(0 1 0); pitch=(0 0 1)",
+    "foFieldAverage": false,
+    "foAverageFields": "U p T",
+    "foPrime2Mean": "off",
+    "foAverageBase": "time",
+    "foProbes": false,
+    "foProbeFields": "p U T alpha.water",
+    "foProbeLocations": "(0 0 0)\n(0.1 0 0)",
+    "foSurfaces": false,
+    "foSurfaceFields": "p U T alpha.water",
+    "foPlanePoint": "(0 0 0)",
+    "foPlaneNormal": "(1 0 0)",
+    "foSurfaceFormat": "vtk",
+    "foSurfaceFieldValue": false,
+    "foSFVMode": "auto",
+    "foSFVPatch": "atmosphere",
+    "foPatchCandidate": "leftWall",
+    "foSFVField": "phi",
+    "foSFVOperation": "sum",
+    "foSFVInterval": "1",
+    "foVolFieldValue": true,
+    "foVFVFields": "alpha.water",
+    "foVFVOperation": "volIntegrate",
+    "foVFVRegion": "all",
+    "foVFVName": "fluid",
+    "ddtScheme": "Euler",
+    "divUScheme": "bounded Gauss limitedLinearV 1",
+    "divScalarScheme": "bounded Gauss upwind",
+    "laplacianScheme": "Gauss linear limited corrected 0.5",
+    "snGradScheme": "limited corrected 0.5",
+    "nNonOrth": "1",
+    "nOuter": "2",
+    "nCorrectors": "2",
+    "pRelTol": "0.05",
+    "pTol": "1e-7",
+    "fieldTol": "1e-8",
+    "nProc": "1",
+    "decompMethod": "scotch",
+    "simpleN": "2 2 1",
+    "distributed": "no",
+    "resolveFeatureAngle": "30",
+    "blockCells": "40 2 40",
+    "boxMin": "(0 0 0)",
+    "boxMax": "(0.584 0.0146 0.584)",
+    "convertToMeters": "1",
+    "bmXMinusName": "leftWall",
+    "bmXMinusType": "wall",
+    "bmXPlusName": "rightWall",
+    "bmXPlusType": "wall",
+    "bmYMinusName": "frontAndBack",
+    "bmYMinusType": "symmetry",
+    "bmYPlusName": "frontAndBack",
+    "bmYPlusType": "symmetry",
+    "bmZMinusName": "bottom",
+    "bmZMinusType": "wall",
+    "bmZPlusName": "atmosphere",
+    "bmZPlusType": "patch",
+    "includeBlockMesh": true,
+    "includeSnappy": false,
+    "snappyCastellated": true,
+    "snappySnap": true,
+    "snappyLayers": false,
+    "surfaceLevelMin": "2",
+    "surfaceLevelMax": "3",
+    "nSurfaceLayers": "3",
+    "layerRelativeSizes": "true",
+    "finalLayerThickness": "0.35",
+    "layerMinThickness": "0.05",
+    "layerExpansionRatio": "1.2",
+    "nCellsBetweenLevels": "3",
+    "snapTolerance": "2",
+    "snapSolveIter": "30"
+  },
+  "patches": [
+    {
+      "name": "leftWall",
+      "purpose": "wallNoSlip",
+      "U": "(0 0 0)",
+      "normal": "(1 0 0)",
+      "area": "1",
+      "Q": "0",
+      "mdot": "0",
+      "p": "0",
+      "T": "293.15",
+      "alpha": "0"
+    },
+    {
+      "name": "rightWall",
+      "purpose": "wallNoSlip",
+      "U": "(0 0 0)",
+      "normal": "(1 0 0)",
+      "area": "1",
+      "Q": "0",
+      "mdot": "0",
+      "p": "0",
+      "T": "293.15",
+      "alpha": "0"
+    },
+    {
+      "name": "bottom",
+      "purpose": "wallNoSlip",
+      "U": "(0 0 0)",
+      "normal": "(1 0 0)",
+      "area": "1",
+      "Q": "0",
+      "mdot": "0",
+      "p": "0",
+      "T": "293.15",
+      "alpha": "0"
+    },
+    {
+      "name": "atmosphere",
+      "purpose": "atmosphere",
+      "U": "(0 0 0)",
+      "normal": "(1 0 0)",
+      "area": "1",
+      "Q": "0",
+      "mdot": "0",
+      "p": "0",
+      "T": "293.15",
+      "alpha": "0"
+    },
+    {
+      "name": "frontAndBack",
+      "purpose": "symmetry",
+      "U": "(0 0 0)",
+      "normal": "(1 0 0)",
+      "area": "1",
+      "Q": "0",
+      "mdot": "0",
+      "p": "0",
+      "T": "293.15",
+      "alpha": "0"
+    }
+  ],
+  "geometries": [
+    {
+      "file": "model.stl",
+      "name": "model",
+      "type": "triSurfaceMesh",
+      "patchType": "wall",
+      "levelMin": "2",
+      "levelMax": "3",
+      "featureLevel": "3",
+      "featureFile": "model.eMesh",
+      "layers": "0"
+    }
+  ],
+  "parts": [],
+  "manualFields": null
+}

@@ -12,7 +12,11 @@ function waveformResult(){
   try{const result=Waveform.generate(config);waveformCache={key,result};return result;}catch(e){waveformCache={key,error:e.message};throw e;}
 }
 function accelerationSourceMode(){return val('accelerationSource');}
-function accelerationSamples(){return accelerationSourceMode()==='waveform'?waveformResult().samples:csvAccelerationSamples();}
+function accelerationSamples(){
+  const raw=accelerationSourceMode()==='waveform'?waveformResult().samples:csvAccelerationSamples();
+  if(!raw.length)return raw;
+  return Acceleration.prepareSamples(raw,{convention:val('accelerationConvention'),gravity:strictVector(val('gVec')),tail:val('accelerationTail'),tailStep:Number(val('accelerationTailStep')),endTime:Number(val('endTime')),margin:val('accelerationTail')==='zero'?Acceleration.runMargin(accelerationRunOptions()):0});
+}
 function accelerationSourceLabel(){return accelerationSourceMode()==='waveform'?'数式で生成した波形':accelerationInput?.fileName||'CSV';}
 function accelerationSourceDescription(){
   if(accelerationSourceMode()==='waveform')return 'Analytic waveform sampled at the specified interval. Input unit: '+val('waveUnit')+'. Parameters and exact expressions are retained in constant/acceleration/waveform.json; generated input-unit samples are in constant/acceleration/generated.csv. t is case time [s], tau=t-startTime of the waveform; phase entries are degrees and the expression variable phi is radians. ';

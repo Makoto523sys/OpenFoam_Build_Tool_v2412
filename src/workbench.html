@@ -101,7 +101,13 @@
 <section class="panel workbench" id="accelerationPanel">
   <h2>スロッシング：容器の入力加速度</h2>
   <label class="inlineCheck" for="enableAcceleration"><input id="enableAcceleration" type="checkbox">容器の並進加速度入力を有効にする</label>
-  <p class="hint" id="accelerationHelp">interFoam / interIsoFoam ＋ 固定メッシュに対応。回転しない容器に固定した座標系で解き、重力 g に対し g − 入力加速度 が作用します。CSV・数式には重力を含めず、容器の加速度の符号をそのまま入力してください。</p>
+  <p class="hint" id="accelerationHelp">interFoam / interIsoFoam ＋ 固定メッシュに対応。回転しない容器の座標系で g − 容器加速度 が作用します。入力値の意味を明示して変換します。基準重力gは物性・重力欄で指定してください。</p>
+  <div class="grid3">
+    <div><label for="accelerationConvention">CSV・数式の加速度の意味</label><select id="accelerationConvention"><option value="container">容器加速度（重力を含まない）</option><option value="gravityIncluded">容器加速度＋基準重力（gを差し引く）</option><option value="effective">流体に作用する総加速度（g−入力へ変換）</option></select></div>
+    <div><label for="accelerationTail">入力終了後</label><select id="accelerationTail"><option value="none">補完しない：解析全体の入力を要求</option><option value="zero">容器加速度0で解析終了後まで延長</option></select></div>
+    <div><label for="accelerationTailStep">追加するゼロ加速度の刻み [s]</label><input id="accelerationTailStep" type="number" min="0" step="any" value="0.01"></div>
+  </div>
+  <p class="hint">ゼロ延長は入力の最終点を保持し、次の追加時刻から容器加速度を0にします。重力は残ります。最終値が0でない場合は接続部に急変があり、スプライン補間による行き過ぎも起こり得ます。例：入力20秒・解析50秒を別々に指定できます。グラフは変換後の容器加速度です。</p>
   <label for="accelerationSource">使用する加速度</label><select id="accelerationSource"><option value="csv">CSVを読み込む</option><option value="waveform">軸別の数式で生成</option></select>
   <p id="accelerationSourceHint" class="hint"></p>
   <div id="accelerationControls">
@@ -159,6 +165,7 @@
   <div class="grid3"><div><label for="meshMotion">方式</label><select id="meshMotion"><option value="static">固定メッシュ</option><option value="mrf">MRF：回転座標系（メッシュ固定）</option><option value="ami">AMI：円筒内のメッシュを回転</option><option value="rigid">領域全体を剛体回転</option><option value="refine">VOF界面に合わせて自動細分化</option></select></div><div><label for="rotationOrigin">回転中心 [m]</label><input id="rotationOrigin" value="(0 0 0)"></div><div><label for="rotationAxis">回転軸（方向ベクトル）</label><input id="rotationAxis" value="(0 0 1)"></div></div>
   <div id="rotationControls" class="grid4"><div><label for="rotationRPM">回転速度 [rpm]</label><input id="rotationRPM" type="number" step="any" value="60"></div><div><label for="rotorRadius">回転円筒 半径 [m]</label><input id="rotorRadius" type="number" step="any" value="0.25"></div><div><label for="rotorLength">回転円筒 長さ [m]</label><input id="rotorLength" type="number" step="any" value="0.5"></div><div><label for="rotorLevel">AMI面の細分化レベル</label><input id="rotorLevel" type="number" min="0" max="8" value="3"></div></div>
   <label for="nonRotatingPatches">MRF領域に接する静止パッチ（空白区切り）</label><input id="nonRotatingPatches" value="inlet outlet walls">
+  <p class="hint">VOF自動細分化は3方向にセルを分割します。empty境界の2次元ケースには使用できません。薄い3次元ケースは厚み方向にも複数セルを設け、前後面を対称境界などに設定してください。</p>
   <div id="refineControls" class="grid4"><div><label for="refineInterval">細分化間隔 [step]</label><input id="refineInterval" type="number" min="1" value="1"></div><div><label for="refineMax">最大追加レベル</label><input id="refineMax" type="number" min="1" max="8" value="2"></div><div><label for="refineCells">最大セル数</label><input id="refineCells" type="number" min="1" value="2000000"></div><div><label for="refineLower">界面判定下限（上限=1−下限）</label><input id="refineLower" type="number" min="0" max="0.49" step="0.001" value="0.001"></div></div>
   <div id="motionStatus" class="note" role="status"></div>
 </section>

@@ -148,6 +148,20 @@ const Acceleration = (() => {
     }
     return `${name}\n{\n    type tabulatedAccelerationSource;\n    active yes;\n    timeDataFileName "$FOAM_CASE/${tablePath}";\n    U U;\n}\n`;
   }
-  return {parseCSV,validate,validateRun,runMargin,table,fvOptions,unitFactor};
+  function prepareSamples(samples,{convention='container',gravity=[0,0,-9.81],tail='none',tailStep=0.01,endTime,margin=0}={}) {
+    const errors=validate(samples);if(errors.length)throw Error(errors.join('\n'));
+    if(!['container','gravityIncluded','effective'].includes(convention))throw Error('加速度の意味が未対応です。');
+    if(!Array.isArray(gravity)||gravity.length!==3||gravity.some(x=>!Number.isFinite(x)))throw Error('基準重力が不正です。');
+    if(!['none','zero'].includes(tail))throw Error('加速度末尾の扱いが未対応です。');
+    const result=samples.map(s=>({time:s.time,acceleration:s.acceleration.map((x,i)=>convention==='gravityIncluded'?x-gravity[i]:convention==='effective'?gravity[i]-x:x)}));
+    if(tail==='zero'){
+      if(!Number.isFinite(tailStep)||tailStep<=0||!Number.isFinite(endTime)||!Number.isFinite(margin)||margin<0)throw Error('ゼロ加速度の追加間隔・終了時刻が不正です。');
+      const last=result.at(-1).time,count=Math.max(0,Math.ceil((endTime+margin-last)/tailStep)+1);
+      if(count+result.length>200000)throw Error('加速度時刻歴は20万点以下にしてください。');
+      for(let i=1;i<=count;i++)result.push({time:Number((last+i*tailStep).toPrecision(15)),acceleration:[0,0,0]});
+    }
+    return result;
+  }
+  return {parseCSV,validate,validateRun,runMargin,table,fvOptions,unitFactor,prepareSamples};
 })();
 if(typeof module!=='undefined')module.exports=Acceleration;

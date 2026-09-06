@@ -40,7 +40,7 @@ async function downloadedZip(a) {
     reader.onerror = reject;
     reader.readAsArrayBuffer(blob);
   });
-  const result = require('node:child_process').spawnSync('python', ['-c', 'import io,sys,zipfile,json; z=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read())); assert z.testzip() is None; print(json.dumps({n:z.read(n).decode() for n in z.namelist()}))'], {input:bytes});
+  const result = require('node:child_process').spawnSync('python3', ['-c', 'import io,sys,zipfile,json; z=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read())); assert z.testzip() is None; print(json.dumps({n:z.read(n).decode() for n in z.namelist()}))'], {input:bytes});
   assert.equal(result.status, 0, result.stderr.toString());
   return JSON.parse(result.stdout);
 }

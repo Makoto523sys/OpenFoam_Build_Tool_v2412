@@ -1,0 +1,14 @@
+{
+  "damBreak_amr": {
+    "time": 1,
+    "cells": 7953,
+    "maxFaceDeviationFromCellBox_m": 0,
+    "maxRelativeVolumeDifferenceFromCellBox": 4.440892098500626e-16
+  },
+  "damBreak_amr_level2": {
+    "time": 0.5,
+    "cells": 20273,
+    "maxFaceDeviationFromCellBox_m": 0,
+    "maxRelativeVolumeDifferenceFromCellBox": 6.661338147750939e-16
+  }
+}

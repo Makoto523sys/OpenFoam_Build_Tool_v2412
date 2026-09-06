@@ -1,0 +1,32 @@
+{
+  "lastTime": 50.0,
+  "ended": true,
+  "initialCells": 23040,
+  "initialWaterCells": 9216,
+  "initialWaterVolume_m3": 1.152,
+  "finalWaterVolume_m3": 1.1519989548,
+  "waterChange_percent": -9.07291666574217e-05,
+  "alphaMin": -4.814824861e-37,
+  "alphaMax": 1.00015368,
+  "heightRows": 5000,
+  "heightMin_m": [
+    1.1709611628,
+    1.1772122976,
+    1.177948873,
+    1.1746670016
+  ],
+  "heightMax_m": [
+    1.2257877611,
+    1.2213092025,
+    1.2222055551,
+    1.230434827
+  ],
+  "warnings": 0,
+  "fatal": 0,
+  "wallSurfaceFiles": 1000,
+  "peakWallShearStress_Pa": 0.004579121246933937,
+  "peakWallShearStressTimeAndWall": [
+    2.4,
+    "shortWall_x0"
+  ]
+}
