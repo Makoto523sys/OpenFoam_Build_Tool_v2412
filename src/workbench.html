@@ -42,7 +42,7 @@
       <div id="geometryStatus" role="status" aria-live="polite" class="note">ASCII / binary STLを読み込むとここに表示します。データはブラウザ内で処理します。</div>
       <div id="partList" class="part-list"></div>
     </div>
-    <div>
+    <div class="patch-sidebar">
       <div class="grid2"><div><label for="stlScale">STL座標 → m</label><select id="stlScale"><option value="1">m（×1）</option><option value="0.001">mm（×0.001）</option><option value="0.01">cm（×0.01）</option><option value="0.0254">inch（×0.0254）</option></select></div><div><label for="selectionMode">面の選び方</label><select id="selectionMode"><option value="smooth">平面・近い法線の連続面</option><option value="triangle">三角形1枚</option><option value="component">接続する部品全体</option><option value="region">元のSTL solid全体</option><option value="patch">割り当て済みパッチ全体</option></select></div></div>
       <label for="selectionAngle">連続面の法線角度 [°]</label><input id="selectionAngle" type="number" min="0" max="180" value="20">
       <div id="selectionStatus" class="note">面を選択してください。</div>
@@ -59,6 +59,19 @@
         <label for="fluidOffset">選択面中心からの距離 [m]（STL法線方向が正）</label><input id="fluidOffset" type="number" step="any" value="0.001"><button id="setFluidPoint" class="ghost">選択面からlocationInMeshを設定</button>
       </details>
       <p class="hint"><a href="#initialWaterPanel">初期水領域（ボックス / 専用STL）</a>・<a href="#accelerationPanel">加速度CSV</a>は下の専用欄で設定します。</p>
+      <section class="panel" id="boundaryPatchesPanel">
+        <h2>4. 境界パッチと0ディレクトリ</h2>
+        <div class="note ok">強化点: patch用途を増やし、<b>体積流量 Q [m3/s]</b> と <b>質量流量 mdot [kg/s]</b> を境界条件として直接指定できるようにしました。</div>
+        <div class="btns"><button id="addPatch" class="light">patch追加</button><button id="addMeshPatches" class="light">形状・背景から追加</button><button id="resetPatches" class="ghost">一覧を空にする</button><button id="guessFields" class="secondary">必要field再推定</button></div>
+        <p id="patchEmptyStatus" class="hint">境界パッチは未登録です。STLの選択面にパッチ・境界条件を割り当てると、ここに追加されます。「patch追加」や「形状・背景から追加」でも登録できます。</p>
+        <div class="tableWrap" style="margin-top:10px"><table id="patchTable"><thead><tr><th>patch名</th><th>用途</th><th>U/接線速度</th><th>normal</th><th>面積A</th><th>Q</th><th>mdot</th><th>p/p_rgh</th><th>T</th><th>alpha</th><th></th></tr></thead><tbody></tbody></table></div>
+        <div class="hint">体積流量/質量流量入口では <span class="mono">flowRateInletVelocity</span>、出口では <span class="mono">flowRateOutletVelocity</span> を生成します。normalと面積Aは初期valueの推算に使います。</div>
+        <details>
+          <summary>生成するfieldを手動調整</summary>
+          <div class="chips" id="fieldChips"></div>
+          <div class="grid3" style="margin-top:10px"><div><label>field追加</label><select id="fieldAddSelect"></select></div><div style="align-self:end"><button id="addFieldBtn" class="light">追加</button></div><div style="align-self:end"><button id="autoFieldsBtn" class="ghost">自動構成へ戻す</button></div></div>
+        </details>
+      </section>
     </div>
   </div>
 </section>
