@@ -39,13 +39,29 @@ function updateSelection(){
   $('assignVisualPatch').disabled=!fs.length; $('hideSelection').disabled=!fs.length; $('isolateSelection').disabled=!fs.length;
   $('undoGeometry').disabled=!geometryHistory.length;
 }
+function clearVisualPatchStatus(){
+  $('visualPatchStatus').hidden=true;$('assignedPatchLink').hidden=true;
+}
+function loadVisualPatch(name){
+  $('visualPatchName').value=name;
+  const p=getPatches().find(x=>x.name===name);
+  if(p){
+    $('visualPurpose').value=p.purpose;
+    for(const [key,id] of Object.entries({U:'visualU',Q:'visualQ',mdot:'visualMdot',p:'visualP',T:'visualT',alpha:'visualAlpha'}))$(id).value=p[key];
+  }
+  clearVisualPatchStatus();
+}
+function visualPatchStatus(text,error=false){
+  const el=$('visualPatchStatus');el.textContent=text;el.className='note '+(error?'danger':'ok');el.hidden=false;
+  $('assignedPatchLink').hidden=error;
+  setStatus(text);
+}
 function pickFace(f,add){
   const part=geometryParts.get(f.file);if(!part)return;
   if(!add)allFaces().forEach(x=>x.selected=false);
   const indices=Geometry.select(part.faces,part.topology,part.faces.indexOf(f),val('selectionMode'),num('selectionAngle',20));
   indices.forEach(i=>part.faces[i].selected=true);
-  $('visualPatchName').value=f.patch;
-  const p=getPatches().find(x=>x.name===f.patch);if(p){$('visualPurpose').value=p.purpose;for(const k of ['U','Q','T','p','alpha','mdot'])$('visual'+({p:'P',alpha:'Alpha',mdot:'Mdot'}[k]||k)).value=p[k];}
+  loadVisualPatch(f.patch);
   viewer?.recolor();updateSelection();
 }
 async function importGeometryFiles(files){
@@ -79,7 +95,7 @@ function renderParts(){
     button('単独表示',()=>{rememberGeometry();allFaces().forEach(f=>{f.hidden=f.file!==name;f.selected=false;});refreshViewer();});
     root.append(row);
     const group=document.createElement('div');group.className='btns';
-    for(const patch of [...new Set(p.faces.map(f=>f.patch))]){const b=document.createElement('button');b.className='light small';b.textContent=patch;b.addEventListener('click',()=>{allFaces().forEach(f=>f.selected=f.patch===patch&&!f.hidden);$('visualPatchName').value=patch;const bc=getPatches().find(x=>x.name===patch);if(bc)$('visualPurpose').value=bc.purpose;viewer?.recolor();updateSelection();});group.append(b);}
+    for(const patch of [...new Set(p.faces.map(f=>f.patch))]){const b=document.createElement('button');b.className='light small';b.textContent=patch;b.addEventListener('click',()=>{allFaces().forEach(f=>f.selected=f.patch===patch&&!f.hidden);loadVisualPatch(patch);viewer?.recolor();updateSelection();});group.append(b);}
     root.append(group);
   }
 }
@@ -87,16 +103,18 @@ function patchDefaults(name,purpose='wallNoSlip') {return {name,purpose,U:'(0 0 
 function patchRow(name){return [...$('patchTable').querySelectorAll('tbody tr')].find(tr=>tr.querySelector('[data-k="name"]').value===name);}
 function upsertPatch(p){const row=patchRow(p.name);if(row){for(const [k,v] of Object.entries(p)){const el=row.querySelector(`[data-k="${k}"]`);if(el)el.value=v;}}else addPatch({...patchDefaults(p.name),...p});}
 function purposeType(purpose){return ['empty','symmetryPlane','symmetry','wedge','cyclic','cyclicAMI'].includes(purpose)?purpose:/wall/i.test(purpose)?'wall':'patch';}
-function meshPatchRequirements(){
+function meshPatchRequirements(includeInactive=false){
   const required=new Map();
-  if(checked('includeBlockMesh'))for(const g of blockMeshGroupedPatches())required.set(g.name,blockMeshPatchPurpose(g.name,g.type));
-  if(checked('includeSnappy'))for(const p of geometryParts.values())for(const f of p.faces)required.set(f.patch,'wallNoSlip');
+  if(includeInactive||checked('includeBlockMesh'))for(const g of blockMeshGroupedPatches())required.set(g.name,blockMeshPatchPurpose(g.name,g.type));
+  if(includeInactive||checked('includeSnappy'))for(const p of geometryParts.values())for(const f of p.faces)required.set(f.patch,'wallNoSlip');
   if(val('meshMotion')==='ami'){required.set('rotorAMI','cyclicAMI');required.set('statorAMI','cyclicAMI');}
   return required;
 }
 function syncVisualPatches(addMissing=false){
-  const required=meshPatchRequirements(),existing=new Set(getPatches().map(p=>p.name)),compressible=cfg().compressible;
-  for(const name of managedPatchNames)if(!required.has(name)){patchRow(name)?.remove();managedPatchNames.delete(name);}
+  const required=meshPatchRequirements(),sources=meshPatchRequirements(true),existing=new Set(getPatches().map(p=>p.name)),compressible=cfg().compressible;
+  // Disabling dictionary output must not delete explicitly registered conditions.
+  // Only remove a managed row when its source patch has actually disappeared.
+  for(const name of managedPatchNames)if(!sources.has(name)){patchRow(name)?.remove();managedPatchNames.delete(name);}
   if(addMissing)for(const [name,purpose] of required)if(!existing.has(name)){
     const p=patchDefaults(name,purpose);if(purpose==='velocityInlet')p.U=p.normal=blockMeshInletDirection(name);
     if(compressible&&purpose==='pressureOutlet')p.p='101325';
@@ -105,15 +123,18 @@ function syncVisualPatches(addMissing=false){
 }
 function assignVisualPatch(){
   const fs=selectedFaces(),name=val('visualPatchName').trim();
-  if(!fs.length)return;
-  if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)){setStatus('パッチ名は半角英字・数字・_で指定し、数字から始めないでください。');return;}
-  if(blockMeshGroupedPatches().some(p=>p.name===name)||['rotorAMI','statorAMI','rotorZone'].includes(name)){setStatus('背景領域・回転領域と重ならないパッチ名にしてください。');return;}
-  if(allFaces().some(f=>!fs.includes(f)&&f.patch===name&&!fs.some(s=>s.file===f.file))){setStatus('別STLと同じパッチ名は使えません。部品ごとに名前を分けてください。');return;}
-  if(new Set(fs.map(f=>f.file)).size>1){setStatus('パッチ割り当てはSTLごとに行ってください。');return;}
+  if(!fs.length){visualPatchStatus('STLの面を選択してから割り当ててください。',true);return;}
+  if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)){visualPatchStatus('パッチ名は半角英字・数字・_で指定し、数字から始めないでください。',true);return;}
+  if(blockMeshGroupedPatches().some(p=>p.name===name)){visualPatchStatus(`${name} は背景メッシュで使用中です。STL側は ${name}_stl などの別名にするか、9番で背景面の名前を変更してください。`,true);return;}
+  if(['rotorAMI','statorAMI','rotorZone'].includes(name)){visualPatchStatus(`${name} は回転領域用の名前です。別のパッチ名を指定してください。`,true);return;}
+  if(allFaces().some(f=>!fs.includes(f)&&f.patch===name&&!fs.some(s=>s.file===f.file))){visualPatchStatus(`${name} は別のSTLで使用中です。部品ごとに名前を分けてください。`,true);return;}
+  if(new Set(fs.map(f=>f.file)).size>1){visualPatchStatus('パッチ割り当てはSTLごとに行ってください。',true);return;}
+  const updating=!!patchRow(name);
   rememberGeometry();fs.forEach(f=>f.patch=name);
   const m=Geometry.measure(fs),scale=Number(val('stlScale'));
   upsertPatch({...patchDefaults(name,val('visualPurpose')),U:val('visualU'),Q:val('visualQ'),mdot:val('visualMdot'),p:val('visualP'),T:val('visualT'),alpha:val('visualAlpha'),area:fmt(m.area*scale*scale),normal:'('+m.normal.join(' ')+')'});
-  managedPatchNames.add(name);generate();refreshViewer();setStatus(`${name} を ${fs.length} 三角形に割り当てました。STL・snappyHexMeshDict・0/のパッチ名を同期します。`);
+  managedPatchNames.add(name);generate();refreshViewer();
+  visualPatchStatus(`${name} を ${fs.length} 三角形に割り当て、第4欄の境界パッチを${updating?'更新':'追加'}しました。入力した条件は0ディレクトリにも反映されます。`);
 }
 function setStatus(text){$('geometryStatus').textContent=text;}
 function setFlow(axis){
@@ -237,7 +258,7 @@ function restoreProject(data){
   if(!solverDb.some(s=>s.id===val('solver')))$('solver').value='pimpleFoam';applySolverDefaults(val('solver'));
   $('patchTable').querySelector('tbody').innerHTML='';data.patches.forEach(p=>addPatch({...patchDefaults('patch'),...p}));
   $('geometryTable').querySelector('tbody').innerHTML='';data.geometries.forEach(addGeometry);geometryParts.clear();selectedGeometryFiles.clear();for(const [name,p] of staged){geometryParts.set(name,p);selectedGeometryFiles.set(name,true);}
-  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set(getPatches().map(p=>p.name).filter(name=>meshPatchRequirements().has(name)));geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();setStatus('作業を復元しました。');
+  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set(getPatches().map(p=>p.name).filter(name=>meshPatchRequirements(true).has(name)));geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();clearVisualPatchStatus();setStatus('作業を復元しました。');
 }
 function demoGeometry(){
   if(geometryParts.size){setStatus('デモを追加する前に作業を保存し、形状一覧の初期化で既存形状を解除してください。');return;}
@@ -252,6 +273,7 @@ function initWorkbench(){
   const bind=(id,fn)=>$(id).addEventListener('click',fn);
   for(const axis of ['X','Y','Z','Iso'])bind('view'+axis,()=>viewer.view(axis.toLowerCase()));
   bind('fitGeometry',()=>refreshViewer(true));bind('assignVisualPatch',assignVisualPatch);bind('demoGeometry',demoGeometry);
+  document.querySelectorAll('input[id^="visual"],select[id^="visual"]').forEach(el=>el.addEventListener('input',clearVisualPatchStatus));
   bind('hideSelection',()=>{rememberGeometry();selectedFaces().forEach(f=>{f.hidden=true;f.selected=false;});refreshViewer();});
   bind('isolateSelection',()=>{rememberGeometry();allFaces().forEach(f=>f.hidden=!f.selected);refreshViewer();});
   bind('showAllFaces',()=>{rememberGeometry();allFaces().forEach(f=>f.hidden=false);refreshViewer();});
