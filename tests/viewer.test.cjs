@@ -99,3 +99,69 @@ test('whole-scene fit includes the box, STL and point, and a background box can 
   }
   gl.calls.length=0;viewer.setFaces([],true);assert.equal(viewer.domainViewState(),'onscreen');assert.equal(gl.calls.find(c=>c.mode==='LINES').count,24);
 });
+
+function closeVector(actual,expected,tolerance=1e-10){expected.forEach((x,i)=>assert.ok(Math.abs(actual[i]-x)<tolerance,`${actual} != ${expected}`));}
+function applyModelAngles(v,degrees){
+  // Independent Cartesian rotations, without the production quaternion helpers.
+  let [x,y,z]=v;const [a,b,c]=degrees.map(x=>x*Math.PI/180);
+  [y,z]=[Math.cos(a)*y-Math.sin(a)*z,Math.sin(a)*y+Math.cos(a)*z];
+  [x,z]=[Math.cos(b)*x+Math.sin(b)*z,-Math.sin(b)*x+Math.cos(b)*z];
+  return [Math.cos(c)*x-Math.sin(c)*y,Math.sin(c)*x+Math.cos(c)*y,z];
+}
+
+test('six signed axis views have the documented right, up and near directions',()=>{
+  const {viewer}=fixture();
+  const bases={x:[[0,0,-1],[0,1,0],[1,0,0]],'-x':[[0,0,1],[0,1,0],[-1,0,0]],y:[[1,0,0],[0,0,-1],[0,1,0]],'-y':[[1,0,0],[0,0,1],[0,-1,0]],z:[[1,0,0],[0,1,0],[0,0,1]],'-z':[[-1,0,0],[0,1,0],[0,0,-1]]};
+  for(const [name,basis] of Object.entries(bases)){
+    assert.equal(viewer.view(name),true);viewer.basis().forEach((row,i)=>closeVector(row,basis[i]));
+    const c=viewer.center,near=c.map((x,i)=>x+basis[2][i]);
+    assert.ok(viewer.project(near)[2]<viewer.project(c)[2],'the chosen side faces the camera');
+  }
+  const before=Array.from(viewer.orientation);assert.equal(viewer.view('invalid'),false);closeVector(viewer.orientation,before);
+});
+
+test('model-axis rotations follow the right-hand rule and are incremental from an arbitrary current view',()=>{
+  const {viewer,face}=fixture();
+  viewer.setPoint([.3,-.4,.7]);viewer.setDomain({min:[-2,-3,-4],max:[3,4,5]});
+  for(const initial of ['z','x','iso'])for(const angles of [[90,0,0],[0,-90,0],[0,0,45],[23,-41,67]]){
+    viewer.view(initial);viewer.pan=[.12,-.08];viewer.zoom=.7;
+    const before=viewer.matrix(),center=Array.from(viewer.center),radius=viewer.radius,source=JSON.stringify([face,viewer.point,viewer.domain]);
+    const points=[...face.v,viewer.point,...viewer.domainCorners];
+    const expected=points.map(p=>viewer.project(applyModelAngles(p.map((x,i)=>x-center[i]),angles).map((x,i)=>x+center[i]),before));
+    assert.equal(viewer.rotateModel(angles),true);
+    points.forEach((p,i)=>closeVector(viewer.project(p),expected[i],2e-7));
+    assert.equal(viewer.zoom,.7);assert.deepEqual(Array.from(viewer.pan),[.12,-.08]);assert.equal(viewer.radius,radius);closeVector(viewer.center,center);
+    assert.equal(JSON.stringify([face,viewer.point,viewer.domain]),source,'rotation changes no geometry or overlay coordinates');
+  }
+  viewer.view('z');viewer.rotateModel([0,0,30]);viewer.rotateModel([0,0,30]);
+  closeVector(viewer.basis()[0],[.5,-Math.sqrt(3)/2,0]);
+});
+
+test('repeated rotations preserve an orthonormal frame and invalid increments leave the view intact',()=>{
+  const {viewer}=fixture();viewer.view('iso');const start=Array.from(viewer.orientation);
+  for(let i=0;i<720;i++)viewer.rotateModel([0,0,.5]);
+  const actual=viewer.orientation[0]*start[0]<0?viewer.orientation.map(x=>-x):viewer.orientation;
+  closeVector(actual,start,1e-11);
+  for(let i=0;i<100;i++)viewer.rotateModel([37,-83,121]);
+  const [a,b,c]=viewer.basis();closeVector([Geometry.dot(a,a),Geometry.dot(b,b),Geometry.dot(c,c)],[1,1,1]);
+  closeVector([Geometry.dot(a,b),Geometry.dot(b,c),Geometry.dot(c,a)],[0,0,0]);
+  closeVector(Geometry.cross(a,b),c);
+  const before=Array.from(viewer.orientation);
+  for(const value of [[NaN,0,0],[0,Infinity,0],[0,0],['30',0,0],null]){assert.equal(viewer.rotateModel(value),false);closeVector(viewer.orientation,before);}
+  viewer.rotateModel([0,0,360]);closeVector(viewer.orientation,before);
+});
+
+test('mouse and keyboard orbit retain roll, and signed rotated views still pick the nearest visible STL face',()=>{
+  const {viewer,events,picks,face}=fixture();
+  viewer.view('z');viewer.rotateModel([0,0,45]);const rolled=viewer.basis().flat();
+  events.pointerdown({clientX:320,clientY:240,button:0,pointerId:1});
+  events.pointerup({clientX:320,clientY:240});closeVector(viewer.basis().flat(),rolled);assert.equal(picks.at(-1),face);
+  events.pointerdown({clientX:320,clientY:240,button:0,pointerId:1});
+  events.pointermove({clientX:321,clientY:240});
+  assert.ok(Math.hypot(...viewer.basis().flat().map((x,i)=>x-rolled[i]))<.02,'dragging must not discard the existing roll');
+  events.pointerup({clientX:321,clientY:240});
+  events.keydown({key:'ArrowLeft',preventDefault(){}});assert.ok(Math.abs(viewer.basis()[0][1])>.6);
+  const far=Geometry.triangle(face.v.map(p=>[p[0],p[1],1]));viewer.setFaces([face,far],true);viewer.view('-z');viewer.rotateModel([0,0,37]);viewer.setPoint([0,0,-2]);
+  const pixel=viewer.project([0,0,0]);viewer.pick((pixel[0]+1)*320,(1-pixel[1])*240,false);assert.equal(picks.at(-1),face);
+  face.hidden=true;viewer.pick((pixel[0]+1)*320,(1-pixel[1])*240,false);assert.equal(picks.at(-1),far);
+});

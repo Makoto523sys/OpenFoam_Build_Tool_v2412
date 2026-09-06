@@ -40,12 +40,13 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
 .waveform-settings{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;box-shadow:none}.wave-axes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}.wave-axis{min-width:0;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff}.wave-axis legend{font-weight:650;padding:0 6px}.wave-equation{font-family:var(--mono);font-size:.78rem;overflow-wrap:anywhere;background:#eff6ff;padding:8px;border-radius:8px}.wave-axis textarea{min-height:70px}#waveformControls h3{margin-top:0}
 .fluid-point-controls{padding:12px;border:1px solid #f9a8b8;border-radius:10px;background:#fff7f9;scroll-margin-top:45vh}.fluid-point-row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}.fluid-point-row>div{flex:1 1 270px;min-width:0}.fluid-point-controls input{font-family:var(--mono)}.fluid-point-controls .hint{margin:7px 0 0}#fluidPointLegend{position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:7px;color:#fff;background:#0b1320d9;padding:6px 8px;border-radius:6px;font:12px var(--mono);pointer-events:none}#fluidPointLegend span{width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:#ff4d80}
 .background-mesh-controls{margin:10px 0;padding:10px 12px;border:1px solid #fcd34d;border-radius:10px;background:#fffbeb}.background-mesh-controls a{display:inline-block;font-size:.8rem;margin-top:7px}.background-mesh-controls .hint{margin:7px 0 0}#backgroundMeshSettings{scroll-margin-top:20px}#backgroundMeshLegend{position:absolute;top:47px;right:12px;display:flex;align-items:center;gap:7px;color:#fff;background:#0b1320d9;padding:6px 8px;border-radius:6px;font:12px var(--mono);pointer-events:none}#backgroundMeshLegend span{width:18px;height:12px;border:2px solid #ffbf26}
+.view-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(76px,1fr));gap:7px;margin-top:12px}.view-presets button{padding:9px 6px;font-weight:650;line-height:1.5}.view-plane{display:block;font-size:.72rem;font-weight:400}.view-presets button[aria-pressed="true"]{background:#dbeafe;border-color:#2563eb;color:#1e40af;box-shadow:inset 0 0 0 1px #2563eb}.view-rotation{border:1px solid var(--line);border-radius:10px;padding:12px;background:#f8fafc}.view-rotation h3{font-size:.9rem;margin:0 0 8px}.view-angle-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.view-angle-fields>div{min-width:0}.view-angle-fields input[aria-invalid="true"]{border-color:var(--danger)}.view-rotation .hint{margin:7px 0 0}#viewRotationStatus[data-error="true"]{color:var(--danger)}
 </style>
 </head>
 <body>
 <header>
   <h1>OpenFOAM v2412 Case Builder v8.4</h1>
-  <p id="buildRevision">境界パッチ登録・削除 修正版</p>
+  <p id="buildRevision">境界パッチ登録・削除 修正版 ／ 6方向ビュー・角度指定対応</p>
   <p>STLを見ながら面と境界条件を設定し、OpenFOAM v2412のケースを生成します。回転メッシュ・VOF適合細分化・初期水STL・加速度CSV・作業保存に対応。HTMLを直接開いて使えます。</p>
 </header>
 
@@ -464,7 +465,7 @@ function init(){
 }
 function bindEvents(){
   document.querySelectorAll('input,select,textarea').forEach(el=>{
-    if(el.type==='file'||['previewText','previewSelect','applicationMirror','geometryFilesPicker','projectPicker','selectionAngle','selectionMode'].includes(el.id)||el.id.startsWith('visual')) return;
+    if(el.type==='file'||['previewText','previewSelect','applicationMirror','geometryFilesPicker','projectPicker','selectionAngle','selectionMode'].includes(el.id)||el.id.startsWith('visual')||el.id.startsWith('viewRotate')) return;
     el.addEventListener('input',()=>{ if(el.id==='solver') applySolverDefaults(el.value); if(el.id==='material') applyMaterial('material'); if(el.id==='material2') syncSigmaFromVOF(); if(['turbulenceType','rasModel','lesModel'].includes(el.id)) manualFields=null; generate(); });
   });
   $('presetRobust').addEventListener('click',()=>{applyPreset('robust'); generate();});

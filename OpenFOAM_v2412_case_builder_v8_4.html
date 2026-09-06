@@ -40,12 +40,13 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
 .waveform-settings{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;box-shadow:none}.wave-axes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}.wave-axis{min-width:0;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fff}.wave-axis legend{font-weight:650;padding:0 6px}.wave-equation{font-family:var(--mono);font-size:.78rem;overflow-wrap:anywhere;background:#eff6ff;padding:8px;border-radius:8px}.wave-axis textarea{min-height:70px}#waveformControls h3{margin-top:0}
 .fluid-point-controls{padding:12px;border:1px solid #f9a8b8;border-radius:10px;background:#fff7f9;scroll-margin-top:45vh}.fluid-point-row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}.fluid-point-row>div{flex:1 1 270px;min-width:0}.fluid-point-controls input{font-family:var(--mono)}.fluid-point-controls .hint{margin:7px 0 0}#fluidPointLegend{position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:7px;color:#fff;background:#0b1320d9;padding:6px 8px;border-radius:6px;font:12px var(--mono);pointer-events:none}#fluidPointLegend span{width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:#ff4d80}
 .background-mesh-controls{margin:10px 0;padding:10px 12px;border:1px solid #fcd34d;border-radius:10px;background:#fffbeb}.background-mesh-controls a{display:inline-block;font-size:.8rem;margin-top:7px}.background-mesh-controls .hint{margin:7px 0 0}#backgroundMeshSettings{scroll-margin-top:20px}#backgroundMeshLegend{position:absolute;top:47px;right:12px;display:flex;align-items:center;gap:7px;color:#fff;background:#0b1320d9;padding:6px 8px;border-radius:6px;font:12px var(--mono);pointer-events:none}#backgroundMeshLegend span{width:18px;height:12px;border:2px solid #ffbf26}
+.view-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(76px,1fr));gap:7px;margin-top:12px}.view-presets button{padding:9px 6px;font-weight:650;line-height:1.5}.view-plane{display:block;font-size:.72rem;font-weight:400}.view-presets button[aria-pressed="true"]{background:#dbeafe;border-color:#2563eb;color:#1e40af;box-shadow:inset 0 0 0 1px #2563eb}.view-rotation{border:1px solid var(--line);border-radius:10px;padding:12px;background:#f8fafc}.view-rotation h3{font-size:.9rem;margin:0 0 8px}.view-angle-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.view-angle-fields>div{min-width:0}.view-angle-fields input[aria-invalid="true"]{border-color:var(--danger)}.view-rotation .hint{margin:7px 0 0}#viewRotationStatus[data-error="true"]{color:var(--danger)}
 </style>
 </head>
 <body>
 <header>
   <h1>OpenFOAM v2412 Case Builder v8.4</h1>
-  <p id="buildRevision">境界パッチ登録・削除 修正版</p>
+  <p id="buildRevision">境界パッチ登録・削除 修正版 ／ 6方向ビュー・角度指定対応</p>
   <p>STLを見ながら面と境界条件を設定し、OpenFOAM v2412のケースを生成します。回転メッシュ・VOF適合細分化・初期水STL・加速度CSV・作業保存に対応。HTMLを直接開いて使えます。</p>
 </header>
 
@@ -60,7 +61,28 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
   <div class="workspace-grid">
     <div>
       <div id="stlPickerSlot"></div>
-      <div class="btns"><button id="demoGeometry" class="light">内部ノズルの例を表示</button><button id="viewX" class="ghost">Xから</button><button id="viewY" class="ghost">Yから</button><button id="viewZ" class="ghost">Zから</button><button id="viewIso" class="ghost">斜め</button></div>
+      <div class="btns"><button id="demoGeometry" class="light">内部ノズルの例を表示</button></div>
+      <div class="view-presets" role="group" aria-label="標準ビュー：見る側と平面">
+        <button id="viewX" class="ghost" data-view="x" aria-pressed="false" title="+X側から見る（YZ平面）"><span class="view-plane">YZ平面</span>+X側</button>
+        <button id="viewNegX" class="ghost" data-view="-x" aria-pressed="false" title="−X側から見る（YZ平面）"><span class="view-plane">YZ平面</span>−X側</button>
+        <button id="viewY" class="ghost" data-view="y" aria-pressed="false" title="+Y側から見る（XZ平面）"><span class="view-plane">XZ平面</span>+Y側</button>
+        <button id="viewNegY" class="ghost" data-view="-y" aria-pressed="false" title="−Y側から見る（XZ平面）"><span class="view-plane">XZ平面</span>−Y側</button>
+        <button id="viewZ" class="ghost" data-view="z" aria-pressed="false" title="+Z側から見る（XY平面）"><span class="view-plane">XY平面</span>+Z側</button>
+        <button id="viewNegZ" class="ghost" data-view="-z" aria-pressed="false" title="−Z側から見る（XY平面）"><span class="view-plane">XY平面</span>−Z側</button>
+        <button id="viewIso" class="ghost" data-view="iso" aria-pressed="true" title="斜めの標準ビュー"><span class="view-plane">立体表示</span>斜め</button>
+      </div>
+      <p id="viewDirectionStatus" class="hint" role="status" aria-live="polite">視点：斜め</p>
+      <div class="view-rotation" id="viewRotationControls">
+        <h3>現在の視点から回転（モデル軸）</h3>
+        <div class="view-angle-fields">
+          <div><label for="viewRotateX">X軸回り [°]</label><input id="viewRotateX" type="number" step="any" value="0" aria-describedby="viewRotationHelp viewRotationStatus"></div>
+          <div><label for="viewRotateY">Y軸回り [°]</label><input id="viewRotateY" type="number" step="any" value="0" aria-describedby="viewRotationHelp viewRotationStatus"></div>
+          <div><label for="viewRotateZ">Z軸回り [°]</label><input id="viewRotateZ" type="number" step="any" value="0" aria-describedby="viewRotationHelp viewRotationStatus"></div>
+        </div>
+        <div class="btns"><button id="applyViewRotation">現在の視点に適用</button><button id="clearViewAngles" class="ghost">入力角度を0にする</button></div>
+        <p id="viewRotationHelp" class="hint">表示中心を基準に、モデルのX→Y→Z軸の順に右ねじ方向へ回転します。正負の角度を指定でき、再度適用すると同じ角度だけ追加で回転します。STLの座標は変わりません。</p>
+        <p id="viewRotationStatus" class="hint" role="status" aria-live="polite">ドラッグで向きを変えた後にも適用できます。</p>
+      </div>
       <div class="viewport"><canvas id="stlCanvas" aria-label="STL・保持点・背景領域の3Dビュー：クリックで面選択、ドラッグで回転、右ドラッグで移動、ホイールで拡大。キーボード：矢印で回転、+/-で拡大縮小、HomeでSTL・点・背景を全体表示" tabindex="0"></canvas><svg id="viewAxes" viewBox="0 0 90 90" aria-label="座標軸"></svg><div id="fluidPointLegend" hidden><span aria-hidden="true"></span>locationInMesh</div><div id="backgroundMeshLegend" hidden><span aria-hidden="true"></span>blockMesh 背景領域</div><div class="view-help">クリック：選択 / Ctrl・Shift：追加選択 / ドラッグ：回転 / 右ドラッグ：移動 / ホイール：拡大</div></div>
       <div class="background-mesh-controls">
         <label class="inlineCheck" for="showBackgroundMesh"><input id="showBackgroundMesh" type="checkbox" checked aria-describedby="backgroundMeshHelp">背景メッシュの範囲を表示</label>
@@ -585,7 +607,9 @@ class STLViewer {
     this.compassId=options.compassId||'viewAxes';
     this.point=null;this.onPointViewChange=options.onPointViewChange;
     this.domain=null;this.domainCorners=[];this.onDomainViewChange=options.onDomainViewChange;
-    this.canvas=canvas;this.onPick=onPick;this.faces=[];this.yaw=-0.65;this.pitch=0.45;this.zoom=1;this.pan=[0,0];
+    this.canvas=canvas;this.onPick=onPick;this.faces=[];this.zoom=1;this.pan=[0,0];
+    this.orientation=STLViewer.multiply(STLViewer.axisAngle(0,.45),STLViewer.axisAngle(1,-.65));
+    this.viewName='iso';this.onViewChange=options.onViewChange;
     this.gl=canvas.getContext('webgl',{antialias:true,preserveDrawingBuffer:true});
     if(!this.gl){canvas.replaceWith(Object.assign(document.createElement('p'),{textContent:'WebGLを利用できません。3D表示にはブラウザのハードウェアアクセラレーションを有効にしてください。ファイルの読み込み・辞書生成は利用できます。'}));return;}
     const gl=this.gl;
@@ -595,10 +619,10 @@ class STLViewer {
     this.program=p;this.pb=gl.createBuffer();this.cb=gl.createBuffer();this.gb=gl.createBuffer();this.pos=gl.getAttribLocation(p,'pos');this.col=gl.getAttribLocation(p,'color');this.mat=gl.getUniformLocation(p,'matrix');
     this.pointBuffer=gl.createBuffer();this.pointSize=gl.getUniformLocation(p,'pointSize');this.markerPass=gl.getUniformLocation(p,'markerPass');this.maxPointSize=gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1];
     this.domainBuffer=gl.createBuffer();
-    canvas.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')this.yaw-=.1;else if(e.key==='ArrowRight')this.yaw+=.1;else if(e.key==='ArrowUp')this.pitch-=.1;else if(e.key==='ArrowDown')this.pitch+=.1;else if(['+','='].includes(e.key))this.zoom=Math.min(100,this.zoom*1.15);else if(e.key==='-')this.zoom=Math.max(.05,this.zoom/1.15);else if(e.key==='Home'){this.setFaces(this.faces,true);}else return;e.preventDefault();this.draw();});
+    canvas.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')this.orbit(-.1,0);else if(e.key==='ArrowRight')this.orbit(.1,0);else if(e.key==='ArrowUp')this.orbit(0,-.1);else if(e.key==='ArrowDown')this.orbit(0,.1);else if(['+','='].includes(e.key))this.zoom=Math.min(100,this.zoom*1.15);else if(e.key==='-')this.zoom=Math.max(.05,this.zoom/1.15);else if(e.key==='Home'){this.setFaces(this.faces,true);}else return;e.preventDefault();this.draw();});
     canvas.addEventListener('contextmenu',e=>e.preventDefault());
     canvas.addEventListener('pointerdown',e=>{this.drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,button:e.button};canvas.setPointerCapture(e.pointerId);});
-    canvas.addEventListener('pointermove',e=>{if(!this.drag)return;const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.x=e.clientX;this.drag.y=e.clientY;if(this.drag.button===2){this.pan[0]+=2*dx/canvas.clientWidth;this.pan[1]-=2*dy/canvas.clientHeight;}else{this.yaw+=dx*.008;this.pitch+=dy*.008;}this.draw();});
+    canvas.addEventListener('pointermove',e=>{if(!this.drag)return;const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y;this.drag.x=e.clientX;this.drag.y=e.clientY;if(this.drag.button===2){this.pan[0]+=2*dx/canvas.clientWidth;this.pan[1]-=2*dy/canvas.clientHeight;}else if(dx||dy){this.orbit(dx*.008,dy*.008);}this.draw();});
     canvas.addEventListener('pointerup',e=>{const d=this.drag;this.drag=null;if(d&&Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<4&&d.button===0){const r=canvas.getBoundingClientRect();this.pick(e.clientX-r.left,e.clientY-r.top,e.ctrlKey||e.metaKey||e.shiftKey);}});
     canvas.addEventListener('wheel',e=>{e.preventDefault();this.zoom=Math.max(.05,Math.min(100,this.zoom*Math.exp(-e.deltaY*.001)));this.draw();},{passive:false});
     canvas.addEventListener('pointercancel',()=>{this.drag=null;});
@@ -656,10 +680,36 @@ class STLViewer {
     if(!this.canvas.clientWidth||!this.canvas.clientHeight)return 'hidden';
     return this.project(this.point).every(x=>Number.isFinite(x)&&Math.abs(x)<=1)?'onscreen':'offscreen';
   }
+  static multiply(a,b){
+    const [w,x,y,z]=a,[v,i,j,k]=b;
+    const q=[w*v-x*i-y*j-z*k,w*i+x*v+y*k-z*j,w*j-x*k+y*v+z*i,w*k+x*j-y*i+z*v],n=Math.hypot(...q);
+    return q.map(c=>c/n);
+  }
+  static axisAngle(axis,angle){const q=[Math.cos(angle/2),0,0,0];q[axis+1]=Math.sin(angle/2);return q;}
+  basis(){
+    const [w,x,y,z]=this.orientation;
+    return [[1-2*(y*y+z*z),2*(x*y-w*z),2*(x*z+w*y)],
+      [2*(x*y+w*z),1-2*(x*x+z*z),2*(y*z-w*x)],
+      [2*(x*z-w*y),2*(y*z+w*x),1-2*(x*x+y*y)]];
+  }
+  orbit(yaw,pitch){
+    // Screen-axis increments keep mouse/keyboard rotation continuous after roll.
+    const delta=STLViewer.multiply(STLViewer.axisAngle(0,pitch),STLViewer.axisAngle(1,yaw));
+    this.orientation=STLViewer.multiply(delta,this.orientation);this.viewName=null;
+  }
+  rotateModel(angles){
+    if(!Array.isArray(angles)||angles.length!==3||!angles.every(Number.isFinite))return false;
+    const [x,y,z]=angles.map(v=>(v%360)*Math.PI/180);
+    // Model-to-view rotation C' = C Rz Ry Rx: fixed model axes, X then Y then Z.
+    const delta=STLViewer.multiply(STLViewer.axisAngle(2,z),STLViewer.multiply(STLViewer.axisAngle(1,y),STLViewer.axisAngle(0,x)));
+    this.orientation=STLViewer.multiply(this.orientation,delta);
+    if(x||y||z)this.viewName=null;
+    this.draw();return true;
+  }
   matrix() {
-    const cy=Math.cos(this.yaw),sy=Math.sin(this.yaw),cp=Math.cos(this.pitch),sp=Math.sin(this.pitch),c=this.center||[0,0,0],r=this.radius||1;
+    const c=this.center||[0,0,0],r=this.radius||1;
     const aspect=Math.max(1,this.canvas.clientWidth)/Math.max(1,this.canvas.clientHeight),s=.85*this.zoom/r;
-    const a=[cy,0,sy],b=[sp*sy,cp,-sp*cy],z=[-cp*sy,sp,cp*cy];
+    const [a,b,z]=this.basis();
     // Extend only the depth range when the point moves; preserve the user's framing.
     let depthRadius=this.point&&this.faces.length?Math.max(r,Math.hypot(...Geometry.sub(this.point,c))):r;
     for(const v of this.domainCorners)depthRadius=Math.max(depthRadius,Math.hypot(...Geometry.sub(v,c)));
@@ -667,6 +717,7 @@ class STLViewer {
   }
   project(v,m=this.matrix()){return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12],m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13],m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]];}
   draw() {
+    this.onViewChange?.(this.viewName);
     this.onPointViewChange?.(this.pointViewState());
     this.onDomainViewChange?.(this.domainViewState());
     if(!this.gl||!this.canvas.clientWidth||!this.canvas.clientHeight)return;const gl=this.gl,canvas=this.canvas,dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(canvas.clientWidth*dpr));canvas.height=Math.max(1,Math.round(canvas.clientHeight*dpr));
@@ -685,7 +736,12 @@ class STLViewer {
     }
     const compass=document.getElementById(this.compassId);if(compass){const m=this.matrix(),aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight),s=.85*this.zoom/(this.radius||1);compass.replaceChildren();for(let i=0;i<3;i++){const x=45+32*m[i*4]*aspect/s,y=45-32*m[i*4+1]/s,line=document.createElementNS('http://www.w3.org/2000/svg','line'),text=document.createElementNS('http://www.w3.org/2000/svg','text');for(const [k,v] of Object.entries({x1:45,y1:45,x2:x,y2:y,stroke:['#f87171','#4ade80','#60a5fa'][i],'stroke-width':2}))line.setAttribute(k,v);text.setAttribute('x',x+3);text.setAttribute('y',y-3);text.setAttribute('fill',['#f87171','#4ade80','#60a5fa'][i]);text.textContent=['X','Y','Z'][i];compass.append(line,text);}}
   }
-  view(axis) {this.pan=[0,0];this.zoom=this.fitZoom();const angles={x:[-Math.PI/2,0],y:[0,Math.PI/2],z:[0,0],iso:[-.65,.45]};[this.yaw,this.pitch]=angles[axis];this.draw();}
+  view(axis) {
+    const angles={x:[-Math.PI/2,0],'-x':[Math.PI/2,0],y:[0,Math.PI/2],'-y':[0,-Math.PI/2],z:[0,0],'-z':[Math.PI,0],iso:[-.65,.45]};
+    if(!Object.hasOwn(angles,axis))return false;
+    const [yaw,pitch]=angles[axis];this.orientation=STLViewer.multiply(STLViewer.axisAngle(0,pitch),STLViewer.axisAngle(1,yaw));
+    this.viewName=axis;this.pan=[0,0];this.zoom=this.fitZoom();this.draw();return true;
+  }
   pick(x,y,add) {
     const p=[2*x/this.canvas.clientWidth-1,1-2*y/this.canvas.clientHeight],m=this.matrix();let hit=null,depth=Infinity;
     for(const f of this.faces){if(f.hidden)continue;const [a,b,c]=f.v.map(v=>this.project(v,m)),den=(b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1]);if(Math.abs(den)<1e-15)continue;const u=((b[1]-c[1])*(p[0]-c[0])+(c[0]-b[0])*(p[1]-c[1]))/den,v=((c[1]-a[1])*(p[0]-c[0])+(a[0]-c[0])*(p[1]-c[1]))/den,w=1-u-v;if(u>=0&&v>=0&&w>=0){const z=u*a[2]+v*b[2]+w*c[2];if(z>=-1&&z<=1&&z<depth){depth=z;hit=f;}}}
@@ -1174,7 +1230,7 @@ function init(){
 }
 function bindEvents(){
   document.querySelectorAll('input,select,textarea').forEach(el=>{
-    if(el.type==='file'||['previewText','previewSelect','applicationMirror','geometryFilesPicker','projectPicker','selectionAngle','selectionMode'].includes(el.id)||el.id.startsWith('visual')) return;
+    if(el.type==='file'||['previewText','previewSelect','applicationMirror','geometryFilesPicker','projectPicker','selectionAngle','selectionMode'].includes(el.id)||el.id.startsWith('visual')||el.id.startsWith('viewRotate')) return;
     el.addEventListener('input',()=>{ if(el.id==='solver') applySolverDefaults(el.value); if(el.id==='material') applyMaterial('material'); if(el.id==='material2') syncSigmaFromVOF(); if(['turbulenceType','rasModel','lesModel'].includes(el.id)) manualFields=null; generate(); });
   });
   $('presetRobust').addEventListener('click',()=>{applyPreset('robust'); generate();});
@@ -1678,6 +1734,22 @@ function updateBackgroundMeshStatus(state){
   $('backgroundMeshLegend').hidden=!['onscreen','clipped'].includes(state);
 }
 function syncViewerOverlays(){viewer.setPoint(fluidPointCoordinates(),false);viewer.setDomain(backgroundMeshDisplayBounds(),false);}
+function updateViewButtons(name){
+  document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===name)));
+  const labels={x:'+X側（YZ平面）','-x':'−X側（YZ平面）',y:'+Y側（XZ平面）','-y':'−Y側（XZ平面）',z:'+Z側（XY平面）','-z':'−Z側（XY平面）',iso:'斜め'};
+  const text='視点：'+(labels[name]||'任意の向き');
+  if($('viewDirectionStatus').textContent!==text)$('viewDirectionStatus').textContent=text;
+}
+function viewAngleInputs(){return ['X','Y','Z'].map(axis=>$('viewRotate'+axis));}
+function applyViewRotation(){
+  const inputs=viewAngleInputs(),angles=inputs.map(el=>el.value.trim()===''?NaN:Number(el.value)),status=$('viewRotationStatus');
+  inputs.forEach((el,i)=>el.setAttribute('aria-invalid',String(!Number.isFinite(angles[i]))));
+  if(!angles.every(Number.isFinite)){
+    status.dataset.error='true';status.textContent='X・Y・Zすべてに有限の角度を入力してください。回転させない軸は0です。';return;
+  }
+  viewer.rotateModel(angles);status.dataset.error='false';
+  status.textContent=`現在の視点から X: ${angles[0]}°、Y: ${angles[1]}°、Z: ${angles[2]}° 回転しました。`;
+}
 function updateFluidPointStatus(state){
   const messages={unset:'保持点を表示できません。(x y z) の有限な座標 [m] と、STLの単位を確認してください。',empty:'メッシュ用STLを読み込むと保持点を表示します。',unavailable:'3D表示を利用できません。座標値は辞書へ反映されます。',hidden:'3D画面を表示すると保持点を確認できます。',offscreen:'保持点は現在の画面外です。「STL・点・背景を全体表示」で確認できます。',onscreen:'ピンクの保持点を表示中。座標の変更は点とsnappyHexMeshDictへ反映されます。'};
   const el=$('fluidPointStatus');if(el.textContent!==messages[state])el.textContent=messages[state];
@@ -1921,9 +1993,11 @@ function demoGeometry(){
 function initWorkbench(){
   const picker=$('geometryFilesPicker');$('stlPickerSlot').append(picker.parentElement);
   $('visualPurpose').innerHTML=patchPurposes.filter(([k])=>!['cyclic','cyclicAMI','wedge','empty','symmetry','interface'].includes(k)).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
-  viewer=new STLViewer($('stlCanvas'),pickFace,{onPointViewChange:updateFluidPointStatus,onDomainViewChange:updateBackgroundMeshStatus});syncViewerOverlays();viewer.setFaces([],true);workbenchReady=true;
+  viewer=new STLViewer($('stlCanvas'),pickFace,{onPointViewChange:updateFluidPointStatus,onDomainViewChange:updateBackgroundMeshStatus,onViewChange:updateViewButtons});syncViewerOverlays();viewer.setFaces([],true);workbenchReady=true;
   const bind=(id,fn)=>$(id).addEventListener('click',fn);
-  for(const axis of ['X','Y','Z','Iso'])bind('view'+axis,()=>viewer.view(axis.toLowerCase()));
+  document.querySelectorAll('[data-view]').forEach(button=>bind(button.id,()=>{viewer.view(button.dataset.view);$('viewRotationStatus').dataset.error='false';$('viewRotationStatus').textContent='標準ビューに切り替えました。角度欄は次に適用する増分です。';}));
+  bind('applyViewRotation',applyViewRotation);
+  bind('clearViewAngles',()=>{viewAngleInputs().forEach(el=>{el.value='0';el.setAttribute('aria-invalid','false');});$('viewRotationStatus').dataset.error='false';$('viewRotationStatus').textContent='入力角度を0にしました。表示の向きは保持しています。';});
   bind('fitGeometry',()=>refreshViewer(true));bind('assignVisualPatch',assignVisualPatch);bind('demoGeometry',demoGeometry);
   document.querySelectorAll('input[id^="visual"],select[id^="visual"]').forEach(el=>el.addEventListener('input',clearVisualPatchStatus));
   bind('hideSelection',()=>{rememberGeometry();selectedFaces().forEach(f=>{f.hidden=true;f.selected=false;});refreshViewer();});
