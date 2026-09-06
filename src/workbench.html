@@ -3,7 +3,28 @@
   <div class="workspace-grid">
     <div>
       <div id="stlPickerSlot"></div>
-      <div class="btns"><button id="demoGeometry" class="light">内部ノズルの例を表示</button><button id="viewX" class="ghost">Xから</button><button id="viewY" class="ghost">Yから</button><button id="viewZ" class="ghost">Zから</button><button id="viewIso" class="ghost">斜め</button></div>
+      <div class="btns"><button id="demoGeometry" class="light">内部ノズルの例を表示</button></div>
+      <div class="view-presets" role="group" aria-label="標準ビュー：見る側と平面">
+        <button id="viewX" class="ghost" data-view="x" aria-pressed="false" title="+X側から見る（YZ平面）"><span class="view-plane">YZ平面</span>+X側</button>
+        <button id="viewNegX" class="ghost" data-view="-x" aria-pressed="false" title="−X側から見る（YZ平面）"><span class="view-plane">YZ平面</span>−X側</button>
+        <button id="viewY" class="ghost" data-view="y" aria-pressed="false" title="+Y側から見る（XZ平面）"><span class="view-plane">XZ平面</span>+Y側</button>
+        <button id="viewNegY" class="ghost" data-view="-y" aria-pressed="false" title="−Y側から見る（XZ平面）"><span class="view-plane">XZ平面</span>−Y側</button>
+        <button id="viewZ" class="ghost" data-view="z" aria-pressed="false" title="+Z側から見る（XY平面）"><span class="view-plane">XY平面</span>+Z側</button>
+        <button id="viewNegZ" class="ghost" data-view="-z" aria-pressed="false" title="−Z側から見る（XY平面）"><span class="view-plane">XY平面</span>−Z側</button>
+        <button id="viewIso" class="ghost" data-view="iso" aria-pressed="true" title="斜めの標準ビュー"><span class="view-plane">立体表示</span>斜め</button>
+      </div>
+      <p id="viewDirectionStatus" class="hint" role="status" aria-live="polite">視点：斜め</p>
+      <div class="view-rotation" id="viewRotationControls">
+        <h3>現在の視点から回転（モデル軸）</h3>
+        <div class="view-angle-fields">
+          <div><label for="viewRotateX">X軸回り [°]</label><input id="viewRotateX" type="number" step="any" value="0" aria-describedby="viewRotationHelp viewRotationStatus"></div>
+          <div><label for="viewRotateY">Y軸回り [°]</label><input id="viewRotateY" type="number" step="any" value="0" aria-describedby="viewRotationHelp viewRotationStatus"></div>
+          <div><label for="viewRotateZ">Z軸回り [°]</label><input id="viewRotateZ" type="number" step="any" value="0" aria-describedby="viewRotationHelp viewRotationStatus"></div>
+        </div>
+        <div class="btns"><button id="applyViewRotation">現在の視点に適用</button><button id="clearViewAngles" class="ghost">入力角度を0にする</button></div>
+        <p id="viewRotationHelp" class="hint">表示中心を基準に、モデルのX→Y→Z軸の順に右ねじ方向へ回転します。正負の角度を指定でき、再度適用すると同じ角度だけ追加で回転します。STLの座標は変わりません。</p>
+        <p id="viewRotationStatus" class="hint" role="status" aria-live="polite">ドラッグで向きを変えた後にも適用できます。</p>
+      </div>
       <div class="viewport"><canvas id="stlCanvas" aria-label="STL・保持点・背景領域の3Dビュー：クリックで面選択、ドラッグで回転、右ドラッグで移動、ホイールで拡大。キーボード：矢印で回転、+/-で拡大縮小、HomeでSTL・点・背景を全体表示" tabindex="0"></canvas><svg id="viewAxes" viewBox="0 0 90 90" aria-label="座標軸"></svg><div id="fluidPointLegend" hidden><span aria-hidden="true"></span>locationInMesh</div><div id="backgroundMeshLegend" hidden><span aria-hidden="true"></span>blockMesh 背景領域</div><div class="view-help">クリック：選択 / Ctrl・Shift：追加選択 / ドラッグ：回転 / 右ドラッグ：移動 / ホイール：拡大</div></div>
       <div class="background-mesh-controls">
         <label class="inlineCheck" for="showBackgroundMesh"><input id="showBackgroundMesh" type="checkbox" checked aria-describedby="backgroundMeshHelp">背景メッシュの範囲を表示</label>

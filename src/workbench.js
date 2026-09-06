@@ -26,6 +26,22 @@ function updateBackgroundMeshStatus(state){
   $('backgroundMeshLegend').hidden=!['onscreen','clipped'].includes(state);
 }
 function syncViewerOverlays(){viewer.setPoint(fluidPointCoordinates(),false);viewer.setDomain(backgroundMeshDisplayBounds(),false);}
+function updateViewButtons(name){
+  document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===name)));
+  const labels={x:'+X側（YZ平面）','-x':'−X側（YZ平面）',y:'+Y側（XZ平面）','-y':'−Y側（XZ平面）',z:'+Z側（XY平面）','-z':'−Z側（XY平面）',iso:'斜め'};
+  const text='視点：'+(labels[name]||'任意の向き');
+  if($('viewDirectionStatus').textContent!==text)$('viewDirectionStatus').textContent=text;
+}
+function viewAngleInputs(){return ['X','Y','Z'].map(axis=>$('viewRotate'+axis));}
+function applyViewRotation(){
+  const inputs=viewAngleInputs(),angles=inputs.map(el=>el.value.trim()===''?NaN:Number(el.value)),status=$('viewRotationStatus');
+  inputs.forEach((el,i)=>el.setAttribute('aria-invalid',String(!Number.isFinite(angles[i]))));
+  if(!angles.every(Number.isFinite)){
+    status.dataset.error='true';status.textContent='X・Y・Zすべてに有限の角度を入力してください。回転させない軸は0です。';return;
+  }
+  viewer.rotateModel(angles);status.dataset.error='false';
+  status.textContent=`現在の視点から X: ${angles[0]}°、Y: ${angles[1]}°、Z: ${angles[2]}° 回転しました。`;
+}
 function updateFluidPointStatus(state){
   const messages={unset:'保持点を表示できません。(x y z) の有限な座標 [m] と、STLの単位を確認してください。',empty:'メッシュ用STLを読み込むと保持点を表示します。',unavailable:'3D表示を利用できません。座標値は辞書へ反映されます。',hidden:'3D画面を表示すると保持点を確認できます。',offscreen:'保持点は現在の画面外です。「STL・点・背景を全体表示」で確認できます。',onscreen:'ピンクの保持点を表示中。座標の変更は点とsnappyHexMeshDictへ反映されます。'};
   const el=$('fluidPointStatus');if(el.textContent!==messages[state])el.textContent=messages[state];
@@ -269,9 +285,11 @@ function demoGeometry(){
 function initWorkbench(){
   const picker=$('geometryFilesPicker');$('stlPickerSlot').append(picker.parentElement);
   $('visualPurpose').innerHTML=patchPurposes.filter(([k])=>!['cyclic','cyclicAMI','wedge','empty','symmetry','interface'].includes(k)).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
-  viewer=new STLViewer($('stlCanvas'),pickFace,{onPointViewChange:updateFluidPointStatus,onDomainViewChange:updateBackgroundMeshStatus});syncViewerOverlays();viewer.setFaces([],true);workbenchReady=true;
+  viewer=new STLViewer($('stlCanvas'),pickFace,{onPointViewChange:updateFluidPointStatus,onDomainViewChange:updateBackgroundMeshStatus,onViewChange:updateViewButtons});syncViewerOverlays();viewer.setFaces([],true);workbenchReady=true;
   const bind=(id,fn)=>$(id).addEventListener('click',fn);
-  for(const axis of ['X','Y','Z','Iso'])bind('view'+axis,()=>viewer.view(axis.toLowerCase()));
+  document.querySelectorAll('[data-view]').forEach(button=>bind(button.id,()=>{viewer.view(button.dataset.view);$('viewRotationStatus').dataset.error='false';$('viewRotationStatus').textContent='標準ビューに切り替えました。角度欄は次に適用する増分です。';}));
+  bind('applyViewRotation',applyViewRotation);
+  bind('clearViewAngles',()=>{viewAngleInputs().forEach(el=>{el.value='0';el.setAttribute('aria-invalid','false');});$('viewRotationStatus').dataset.error='false';$('viewRotationStatus').textContent='入力角度を0にしました。表示の向きは保持しています。';});
   bind('fitGeometry',()=>refreshViewer(true));bind('assignVisualPatch',assignVisualPatch);bind('demoGeometry',demoGeometry);
   document.querySelectorAll('input[id^="visual"],select[id^="visual"]').forEach(el=>el.addEventListener('input',clearVisualPatchStatus));
   bind('hideSelection',()=>{rememberGeometry();selectedFaces().forEach(f=>{f.hidden=true;f.selected=false;});refreshViewer();});
