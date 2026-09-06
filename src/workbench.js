@@ -146,7 +146,7 @@ function assignVisualPatch(){
   if(allFaces().some(f=>!fs.includes(f)&&f.patch===name&&!fs.some(s=>s.file===f.file))){visualPatchStatus(`${name} は別のSTLで使用中です。部品ごとに名前を分けてください。`,true);return;}
   if(new Set(fs.map(f=>f.file)).size>1){visualPatchStatus('パッチ割り当てはSTLごとに行ってください。',true);return;}
   const updating=!!patchRow(name);
-  rememberGeometry();fs.forEach(f=>f.patch=name);
+  const oldNames=new Set(fs.map(f=>f.patch));rememberGeometry();fs.forEach(f=>f.patch=name);for(const old of oldNames)if(!allFaces().some(f=>f.patch===old))renamePatchReferences(old,name);
   const m=Geometry.measure(fs),scale=Number(val('stlScale'));
   upsertPatch({...patchDefaults(name,val('visualPurpose')),U:val('visualU'),Q:val('visualQ'),mdot:val('visualMdot'),p:val('visualP'),T:val('visualT'),alpha:val('visualAlpha'),area:fmt(m.area*scale*scale),normal:'('+m.normal.join(' ')+')'});
   managedPatchNames.add(name);generate();refreshViewer();
@@ -246,7 +246,7 @@ function blockingErrors(){
     if(mode==='ami')for(const part of geometryParts.values()){let inside=false,outside=false;for(const f of part.faces)for(const v of f.v){if(insideRotor(v.map(x=>x*Number(val('stlScale')))))inside=true;else outside=true;}if(inside&&outside)errs.push(`${part.file}: 回転円筒が部品を横切っています。回転部品を円筒内へ完全に収めてください。`);}
   }
   if(c.vof&&val('waterRegionMode')==='box'){const a=strictVector(val('waterBoxMin')),b=strictVector(val('waterBoxMax'));if(!a||!b||a.some((x,i)=>x>=b[i]))errs.push('VOF水領域の最小座標 < 最大座標を満たしてください。');}
-  return [...new Set([...errs,...auxiliaryInputErrors(c)])];
+  return [...new Set([...errs,...auxiliaryInputErrors(c),...caseInputErrors(c)])];
 }
 function rotorSurface(){const axis=strictVector(val('rotationAxis'));return Geometry.cylinder(strictVector(val('rotationOrigin'))||[0,0,0],axis&&Math.hypot(...axis)>0?axis:[0,0,1],Math.max(num('rotorRadius'),1e-12),Math.max(num('rotorLength'),1e-12));}
 function rotationCoeffs(){return `origin ${val('rotationOrigin')};\n        axis (${normVec(val('rotationAxis')).join(' ')});\n        omega ${fmt(num('rotationRPM')*2*Math.PI/60)}; // rad/s, converted from rpm\n`;}
@@ -268,16 +268,46 @@ function motionFiles(c){
 }
 function buildAllrun(c){
   const mode=val('meshMotion'),commands=[];
-  if(checked('includeBlockMesh'))commands.push('runApplication blockMesh');else commands.push('test -f constant/polyMesh/points || { echo "Existing constant/polyMesh is required" >&2; exit 1; }');
-  if(checked('includeSnappy'))commands.push('runApplication surfaceFeatureExtract','runApplication snappyHexMesh -overwrite');
-  if(mode==='ami')commands.push('runApplication createPatch -overwrite');
-  if(mode==='mrf')commands.push('runApplication topoSet');
-  commands.push('runApplication checkMesh -allTopology -allGeometry');
-  if(c.vof)commands.push('runApplication setFields');
-  if(num('nProc')>1)commands.push('runApplication decomposePar',`runParallel -np ${val('nProc')} ${c.solver.id}`,'runApplication reconstructPar');else commands.push(`runApplication ${c.solver.id}`);
-  return `#!/bin/sh\nset -e\ncd "\${0%/*}" || exit 1\n. "\${WM_PROJECT_DIR:?Source OpenFOAM v2412 first}/bin/tools/RunFunctions"\n[ "\${WM_PROJECT_VERSION:-}" = v2412 ] || { echo "OpenFOAM v2412 is required" >&2; exit 1; }\n${commands.join('\n')}\ntouch ${c.caseName}.foam\n`;
+  if(checked('includeBlockMesh'))commands.push('runFresh blockMesh');else commands.push('test -f constant/polyMesh/points -o -f constant/polyMesh/points.gz || { echo "Existing constant/polyMesh is required" >&2; exit 1; }');
+  if(checked('includeSnappy'))commands.push('runFresh surfaceFeatureExtract','runFresh snappyHexMesh -overwrite');
+  if(mode==='ami')commands.push('runFresh createPatch -overwrite');
+  if(mode==='mrf')commands.push('runFresh topoSet');
+  commands.push('python3 scripts/validate_case.py');
+  if(c.vof)commands.push('runFresh setFields');
+  if(num('nProc')>1)commands.push('runFresh decomposePar -force',`runParallelFresh ${val('nProc')} ${c.solver.id}`,'runFresh reconstructPar');else commands.push(`runFresh ${c.solver.id}`);
+  return `#!/bin/sh
+set -eu
+export LC_ALL=C
+cd "$(dirname "$0")" || exit 1
+[ "\${WM_PROJECT_VERSION:-}" = v2412 ] || { echo "Source OpenCFD OpenFOAM v2412 first" >&2; exit 1; }
+command -v python3 >/dev/null || { echo "Python 3 is required for the mesh and boundary checks" >&2; exit 1; }
+runFresh()
+{
+    case_builder_log="log.$1"
+    echo "Running $*"
+    if "$@" >"$case_builder_log" 2>&1; then :; else
+        case_builder_status=$?
+        tail -n 40 "$case_builder_log" >&2
+        exit "$case_builder_status"
+    fi
 }
-function caseGuide(c){return auxiliaryGuide(c)+`# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Register the mesh boundary regions in the boundary-condition table before using the case.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
+runParallelFresh()
+{
+    case_builder_np="$1"
+    shift
+    case_builder_log="log.$1"
+    echo "Running $* on $case_builder_np processes"
+    if mpirun -np "$case_builder_np" "$@" -parallel >"$case_builder_log" 2>&1; then :; else
+        case_builder_status=$?
+        tail -n 40 "$case_builder_log" >&2
+        exit "$case_builder_status"
+    fi
+}
+${commands.join('\n')}
+touch ${c.caseName}.foam
+`;
+}
+function caseGuide(c){return auxiliaryGuide(c)+`# Run and inspect this case\n\nSource OpenCFD OpenFOAM v2412 and run sh Allrun. Python 3 is required. Allrun reruns preprocessing, then scripts/validate_case.py performs a fresh checkMesh, fingerprints the mesh and checks actual nonempty patches against initial fields and monitoring references. A failed or incomplete check stops before decomposition and solving. Inspect log.checkMesh and case-check-report.json. Bad mesh sets are requested in VTK format for diagnosis.\n\nFlow monitoring is included from system/flowMonitors. Automatic selections are resolved against the actual mesh; manual missing patches stop the run. patchFlux_<name> gives signed flux (outward positive); flowBalance sums the selected inlet/outlet patches. solverInfo1 records equation solver information. Keep the complete exported case together.\n\nPIMPLE residualControl applies within each time step, not to convergence of the entire time history. nOuterCorrectors=1 has no outer iterations to shorten. SIMPLE residualControl terminates steady iterations.\n\n# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Register the mesh boundary regions in the boundary-condition table before using the case.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
 function projectSnapshot(){const inputs={};document.querySelectorAll('input[id],select[id],textarea[id]').forEach(el=>{if(!['file'].includes(el.type)&&!['previewText','previewSelect','applicationMirror','fieldAddSelect'].includes(el.id))inputs[el.id]=el.type==='checkbox'?el.checked:el.value;});const data={format:'OpenFOAM-Case-Builder',version:3,auxiliary:auxiliaryProjectData(),inputs,patches:getPatches(),geometries:getGeometries(),parts:[...geometryParts.values()].map(p=>({file:p.file,originalName:p.originalName,faces:p.faces.map(f=>({v:f.v,region:f.region,patch:f.patch,hidden:f.hidden}))})),manualFields};return data;}
 function saveProject(){if(auxiliaryBusy){setStatus('CSV / 初期水領域STLの読み込み完了を待ってください。');return;}const data=projectSnapshot();saveBlob(new Blob([JSON.stringify(data)],{type:'application/json'}),sanitizeCaseName(val('caseName'))+'.project.json');}
 function restoreProject(data){
@@ -285,7 +315,7 @@ function restoreProject(data){
   if(data.parts.reduce((n,p)=>n+(p.faces?.length||0),0)>750000)throw Error('作業ファイルの三角形数が上限を超えています。');
   const auxiliaryStaged=stageAuxiliaryProject(data);
   const staged=new Map();for(const p of data.parts){if(!/^[A-Za-z_][A-Za-z0-9_]*\.stl$/.test(p.file)||staged.has(p.file))throw Error('作業ファイルのSTL名が不正です。');const faces=p.faces.map(f=>({...Geometry.triangle(f.v,f.region),patch:Geometry.word(f.patch),hidden:!!f.hidden,file:p.file}));staged.set(p.file,{file:p.file,originalName:p.originalName,faces,topology:Geometry.topology(faces)});}
-  for(const [id,value] of Object.entries({showBackgroundMesh:true,domainMarginPercent:'20',...auxiliaryProjectInputs(data)})){const el=$(id);if(!el||el.type==='file'||!el.matches('input,select,textarea')||['previewText','previewSelect','applicationMirror'].includes(id))continue;if(el.type==='checkbox')el.checked=!!value;else el.value=String(value);}
+  for(const [id,value] of Object.entries({showBackgroundMesh:true,domainMarginPercent:'20',...caseCheckDefaults(data),...auxiliaryProjectInputs(data)})){const el=$(id);if(!el||el.type==='file'||!el.matches('input,select,textarea')||['previewText','previewSelect','applicationMirror'].includes(id))continue;if(el.type==='checkbox')el.checked=!!value;else el.value=String(value);}
   if(!solverDb.some(s=>s.id===val('solver')))$('solver').value='pimpleFoam';applySolverDefaults(val('solver'));
   $('patchTable').querySelector('tbody').innerHTML='';data.patches.forEach(p=>addPatch({...patchDefaults('patch'),...p}));
   $('geometryTable').querySelector('tbody').innerHTML='';data.geometries.forEach(addGeometry);geometryParts.clear();selectedGeometryFiles.clear();for(const [name,p] of staged){geometryParts.set(name,p);selectedGeometryFiles.set(name,true);}
@@ -299,7 +329,7 @@ function demoGeometry(){
 }
 function initWorkbench(){
   const picker=$('geometryFilesPicker');$('stlPickerSlot').append(picker.parentElement);
-  $('visualPurpose').innerHTML=patchPurposes.filter(([k])=>!['cyclic','cyclicAMI','wedge','empty','symmetry','interface'].includes(k)).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
+  $('visualPurpose').innerHTML=patchPurposes.filter(([k])=>!['cyclic','cyclicAMI','wedge','interface'].includes(k)).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
   viewer=new STLViewer($('stlCanvas'),pickFace,{onPointViewChange:updateFluidPointStatus,onDomainViewChange:updateBackgroundMeshStatus,onViewChange:updateViewButtons});syncViewerOverlays();viewer.setFaces([],true);workbenchReady=true;
   const bind=(id,fn)=>$(id).addEventListener('click',fn);
   document.querySelectorAll('[data-view]').forEach(button=>bind(button.id,()=>{viewer.view(button.dataset.view);$('viewRotationStatus').dataset.error='false';$('viewRotationStatus').textContent='標準ビューに切り替えました。角度欄は次に適用する増分です。';}));

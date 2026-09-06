@@ -48,7 +48,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
 <body>
 <header>
   <h1>OpenFOAM v2412 Case Builder v8.4</h1>
-  <p id="buildRevision">境界パッチ登録・削除 修正版 ／ 6方向ビュー・角度指定・STLからの背景範囲自動設定</p>
+  <p id="buildRevision">境界パッチ登録・削除 修正版 ／ 6方向ビュー・角度指定・STLからの背景範囲自動設定 ／ v2412実行前検査 修正版</p>
   <p>STLを見ながら面と境界条件を設定し、OpenFOAM v2412のケースを生成します。回転メッシュ・VOF適合細分化・初期水STL・加速度CSV・作業保存に対応。HTMLを直接開いて使えます。</p>
 </header>
 
@@ -130,7 +130,11 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
         <div class="note ok">強化点: patch用途を増やし、<b>体積流量 Q [m3/s]</b> と <b>質量流量 mdot [kg/s]</b> を境界条件として直接指定できるようにしました。</div>
         <div class="btns"><button id="addPatch" class="light">patch追加</button><button id="addMeshPatches" class="light">形状・背景から追加</button><button id="resetPatches" class="ghost">一覧を空にする</button><button id="guessFields" class="secondary">必要field再推定</button></div>
         <p id="patchEmptyStatus" class="hint">境界パッチは未登録です。STLの選択面にパッチ・境界条件を割り当てると、ここに追加されます。「patch追加」や「形状・背景から追加」でも登録できます。</p>
-        <div class="tableWrap" style="margin-top:10px"><table id="patchTable"><thead><tr><th>patch名</th><th>用途</th><th>U/接線速度</th><th>normal</th><th>面積A</th><th>Q</th><th>mdot</th><th>p/p_rgh</th><th>T</th><th>alpha</th><th></th></tr></thead><tbody></tbody></table></div>
+        <p class="hint">背景パッチとSTL由来パッチは別の境界です。STL名から用途は変更しません。最終的に残るパッチと圧力・流量監視は、Allrunでメッシュ生成後に照合します。</p>
+        <div id="boundarySetupStatus" class="note" role="status"></div>
+        <details><summary>symmetry・symmetryPlane・emptyの違い</summary><p class="hint">symmetryは面ごとの法線を使う対称条件です。symmetryPlaneは単一平面・共通法線のパッチに使います。反対向きの2面をまとめる場合はsymmetryを選ぶか、面を別パッチへ分けてください。emptyは2次元用で、厚み方向1セル・前後面の対応が必要です。STLにemptyを指定しただけで2次元メッシュにはなりません。</p></details>
+        <div class="tableWrap" style="margin-top:10px"><table id="patchTable"><thead><tr><th>patch名・出所</th><th>用途</th><th>U/接線速度</th><th>normal</th><th>面積A</th><th>Q</th><th>mdot</th><th>p/p_rgh</th><th>T</th><th>alpha</th><th></th></tr></thead><tbody></tbody></table></div>
+        <details><summary>形状寸法・入口流量の確認（m換算）</summary><div id="physicalScaleSummary" class="hint"></div></details>
         <div class="hint">体積流量/質量流量入口では <span class="mono">flowRateInletVelocity</span>、出口では <span class="mono">flowRateOutletVelocity</span> を生成します。normalと面積Aは初期valueの推算に使います。</div>
         <details>
           <summary>生成するfieldを手動調整</summary>
@@ -317,7 +321,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
         <div><label class="help" data-help="最大Courant数です。まず流すなら0.5程度、LESでは格子と時間精度に合わせて管理します。">maxCo</label><input id="maxCo" type="number" step="any" value="0.5" /></div>
         <div><label class="help" data-help="VOF相分率の最大Courant数です。界面安定化のため0.1〜0.3程度から開始します。">maxAlphaCo</label><input id="maxAlphaCo" type="number" step="any" value="0.25" /></div>
         <div><label class="help" data-help="adjustTimeStep=yesで許す最大deltaTです。0以下なら出力しません。">maxDeltaT</label><input id="maxDeltaT" type="number" step="any" value="0" /></div>
-        <div><label class="help" data-help="solver logの標準出力設定です。通常は1です。">InfoSwitch level</label><input id="infoLevel" type="number" value="1" /></div>
+        <div><label for="initialU">初期内部速度 U [m/s]</label><input id="initialU" value="(0 0 0)" /></div>
       </div>
     </section>
 
@@ -327,7 +331,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
       <details open>
         <summary>基本監視</summary>
         <div class="grid3">
-          <div><label class="inlineCheck"><input id="foResiduals" type="checkbox" checked /> residuals</label><label class="help" data-help="残差監視対象fieldです。存在しないfieldはOpenFOAM側でエラーになることがあるため生成fieldと整合させてください。">fields</label><input id="foResidualFields" value="p p_rgh U T k epsilon omega alpha.water" /></div>
+          <div><label class="inlineCheck"><input id="foResiduals" type="checkbox" checked /> 残差監視 solverInfo</label><label for="foResidualMode">監視対象</label><select id="foResidualMode"><option value="auto">ソルバー・モデルから自動選択</option><option value="manual">手動指定</option></select><label for="foResidualFields">fields（空白区切り）</label><input id="foResidualFields" value="" /><p id="residualFieldsHelp" class="hint"></p></div>
           <div><label class="inlineCheck"><input id="foCourant" type="checkbox" checked /> CourantNo</label><label class="help" data-help="functionObjectのwriteControlです。timeStep/runTime/writeTimeなど。">writeControl</label><select id="foBasicWriteControl"><option>timeStep</option><option>runTime</option><option>writeTime</option></select></div>
           <div><label class="inlineCheck"><input id="foYPlus" type="checkbox" /> yPlus</label><label class="help" data-help="functionObjectのwriteIntervalです。writeControlに対する間隔です。">writeInterval</label><input id="foBasicWriteInterval" type="number" value="1" /></div>
         </div>
@@ -389,9 +393,9 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
       <details>
         <summary>流量・体積集計</summary>
         <div class="grid4">
-          <div><label class="inlineCheck"><input id="foSurfaceFieldValue" type="checkbox" checked /> patch流量集計</label><label class="help" data-help="集計対象patchです。出口流量やphiの総和確認に使います。">patch</label><input id="foSFVPatch" value="outlet" /></div>
-          <div><label class="help" data-help="集計するsurfaceFieldです。非圧縮ではphi、圧縮性ではrhoPhi等を使います。">field</label><input id="foSFVField" value="phi" /></div>
-          <div><label class="help" data-help="sum/areaAverage/weightedAreaAverageなど。流量収支はsumが基本です。">operation</label><select id="foSFVOperation"><option>sum</option><option>areaAverage</option><option>weightedAreaAverage</option><option>min</option><option>max</option></select></div>
+          <div><label class="inlineCheck"><input id="foSurfaceFieldValue" type="checkbox" checked /> 入口・出口の流量監視</label><label for="foSFVMode">対象の選び方</label><select id="foSFVMode"><option value="auto">登録した入口・出口から自動選択</option><option value="manual">手動指定（複数可）</option></select><label for="foSFVPatch">patch名（空白区切り）</label><input id="foSFVPatch" value="" /><label for="foPatchCandidate">パッチ候補（出所付き）</label><select id="foPatchCandidate"></select><button id="addFluxPatch" type="button" class="light">候補を監視対象に追加</button><p id="fluxPatchHelp" class="hint"></p></div>
+          <div><label for="foSFVField">流束field</label><select id="foSFVField"><option value="phi">phi（単相非圧縮: m³/s・圧縮性: kg/s）</option><option value="rhoPhi">rhoPhi（VOFの質量流束: kg/s）</option></select><p class="hint">外向きが正、流入は負。sumの場合、個別パッチと選択パッチ全体の符号付き和を出力します。非定常圧縮性では領域内の質量変化も収支に含めます。</p></div>
+          <div><label class="help" data-help="流束phiの流量収支にはsumを使います。">operation</label><select id="foSFVOperation"><option>sum</option><option>areaAverage</option><option>min</option><option>max</option></select></div>
           <div><label class="help" data-help="出力intervalです。">interval</label><input id="foSFVInterval" type="number" value="1" /></div>
         </div>
         <div class="grid4">
@@ -414,7 +418,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
         <div><label class="help" data-help="laplacianの非直交補正。非直交が大きいとlimited correctedが安全です。">laplacian</label><select id="laplacianScheme"><option>Gauss linear corrected</option><option>Gauss linear limited corrected 0.5</option><option>Gauss linear limited corrected 0.333</option><option>Gauss linear orthogonal</option></select></div>
         <div><label class="help" data-help="snGrad補正。メッシュ品質が悪い場合はlimited correctedを検討します。">snGrad</label><select id="snGradScheme"><option>corrected</option><option>limited corrected 0.5</option><option>limited corrected 0.333</option><option>orthogonal</option></select></div>
         <div><label class="help" data-help="PIMPLE/SIMPLEの非直交補正回数です。">nNonOrthCorr</label><input id="nNonOrth" type="number" value="1" /></div>
-        <div><label class="help" data-help="PIMPLE outer corrector数。強連成や大きいΔtでは2以上を検討します。">nOuterCorr</label><input id="nOuter" type="number" value="1" /></div>
+        <div><label class="help" data-help="PIMPLEの各時間ステップ内の外部反復上限。1では外部反復の残差による短縮はありません。residualControlは解析時間全体を終了する基準ではありません。">nOuterCorr</label><input id="nOuter" type="number" value="1" /><p id="algorithmHelp" class="hint"></p></div>
       </div>
       <div class="grid4">
         <div><label class="help" data-help="PIMPLE/PISOの圧力補正回数です。">nCorrectors</label><input id="nCorrectors" type="number" value="2" /></div>
@@ -460,12 +464,12 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
           <button id="bmSyncPatches" class="secondary">0ディレクトリpatch表へ反映</button>
         </div>
         <div class="tableWrap"><table id="blockFaceTable"><thead><tr><th>面</th><th>座標側</th><th>patch名</th><th>blockMesh type</th><th>対応face頂点</th></tr></thead><tbody>
-          <tr><td>X-</td><td>x = min</td><td><input id="bmXMinusName" value="inlet" title="X-側のpatch名です。既定はinlet。"></td><td><select id="bmXMinusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 4 7 3)</td></tr>
-          <tr><td>X+</td><td>x = max</td><td><input id="bmXPlusName" value="outlet" title="X+側のpatch名です。既定はoutlet。"></td><td><select id="bmXPlusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(1 2 6 5)</td></tr>
-          <tr><td>Y-</td><td>y = min</td><td><input id="bmYMinusName" value="walls" title="Y-側のpatch名です。"></td><td><select id="bmYMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 1 5 4)</td></tr>
-          <tr><td>Y+</td><td>y = max</td><td><input id="bmYPlusName" value="walls" title="Y+側のpatch名です。Y-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmYPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(3 7 6 2)</td></tr>
-          <tr><td>Z-</td><td>z = min</td><td><input id="bmZMinusName" value="walls" title="Z-側のpatch名です。2D計算ではfrontAndBackなどにしてemptyを選ぶことが多いです。"></td><td><select id="bmZMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 3 2 1)</td></tr>
-          <tr><td>Z+</td><td>z = max</td><td><input id="bmZPlusName" value="walls" title="Z+側のpatch名です。Z-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmZPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(4 5 6 7)</td></tr>
+          <tr><td>X-</td><td>x = min</td><td><input id="bmXMinusName" value="inlet" title="X-側のpatch名です。既定はinlet。"></td><td><select id="bmXMinusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 4 7 3)</td></tr>
+          <tr><td>X+</td><td>x = max</td><td><input id="bmXPlusName" value="outlet" title="X+側のpatch名です。既定はoutlet。"></td><td><select id="bmXPlusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(1 2 6 5)</td></tr>
+          <tr><td>Y-</td><td>y = min</td><td><input id="bmYMinusName" value="walls" title="Y-側のpatch名です。"></td><td><select id="bmYMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 1 5 4)</td></tr>
+          <tr><td>Y+</td><td>y = max</td><td><input id="bmYPlusName" value="walls" title="Y+側のpatch名です。Y-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmYPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(3 7 6 2)</td></tr>
+          <tr><td>Z-</td><td>z = min</td><td><input id="bmZMinusName" value="walls" title="Z-側のpatch名です。2D計算ではfrontAndBackなどにしてemptyを選ぶことが多いです。"></td><td><select id="bmZMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 3 2 1)</td></tr>
+          <tr><td>Z+</td><td>z = max</td><td><input id="bmZPlusName" value="walls" title="Z+側のpatch名です。Z-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmZPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(4 5 6 7)</td></tr>
         </tbody></table></div>
         <div class="note warn">同じpatch名を複数面に使う場合、blockMesh typeは同じにしてください。例: Y±/Z±をすべて <span class="mono">walls / wall</span> にすると1つのwalls patchへ結合します。</div>
       </details>
@@ -480,8 +484,13 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
         <div><label class="help" data-help="新しく追加する形状行の表面refinement最小levelです。各行でも個別に変更できます。">default surfaceLevelMin</label><input id="surfaceLevelMin" type="number" value="2" /></div>
         <div><label class="help" data-help="新しく追加する形状行の表面refinement最大levelです。各行でも個別に変更できます。">default surfaceLevelMax</label><input id="surfaceLevelMax" type="number" value="3" /></div>
         <div><label class="help" data-help="新しく追加する形状行の境界層数です。0ならその形状にはlayerを張りません。">default nSurfaceLayers</label><input id="nSurfaceLayers" type="number" value="3" /></div>
-        <div><label class="help" data-help="最終層厚さです。relativeSizes=trueでは近傍セルサイズに対する比です。全形状共通です。">finalLayerThickness</label><input id="finalLayerThickness" type="number" step="any" value="0.35" /></div>
+        <div><label for="layerRelativeSizes">層厚の指定</label><select id="layerRelativeSizes"><option value="true">相対値：近傍セル寸法に対する比</option><option value="false">絶対値：m</option></select></div>
+        <div><label for="finalLayerThickness">最外層の厚さ（比 / m）</label><input id="finalLayerThickness" type="number" step="any" value="0.35" /></div>
+        <div><label for="layerMinThickness">許容する最小総厚さ（比 / m）</label><input id="layerMinThickness" type="number" step="any" value="0.05" /></div>
+        <div><label for="layerExpansionRatio">層の膨張率</label><input id="layerExpansionRatio" type="number" step="any" value="1.2" /></div>
       </div>
+      <p id="layerSummary" class="hint"></p>
+      <details><summary>メッシュ品質の調整と不合格箇所の確認</summary><p class="hint">AllrunはcheckMeshを毎回実行し、不合格なら計算を止めます。凹セル・凹面はlog.checkMeshとVTK出力で位置を確認してください。原因を確認して形状の角、細分化遷移、スナップを調整します。品質閾値は自動では緩和しません。</p><div class="grid3"><div><label for="nCellsBetweenLevels">細分化レベル間のセル数</label><input id="nCellsBetweenLevels" type="number" min="1" value="3"></div><div><label for="snapTolerance">snap tolerance（局所辺長の倍率）</label><input id="snapTolerance" type="number" min="0" step="any" value="2"></div><div><label for="snapSolveIter">snap nSolveIter</label><input id="snapSolveIter" type="number" min="1" value="30"></div></div></details>
       <div class="btns" style="margin:10px 0">
         <button id="addGeometry" class="light">形状行を追加</button>
         <button id="resetGeometries" class="ghost">標準形状へ戻す</button>
@@ -1174,9 +1183,9 @@ const rasModels = ['kOmegaSST','kEpsilon','realizableKE','RNGkEpsilon','SpalartA
 const lesModels = ['Smagorinsky','WALE','dynamicKEqn','kEqn','SpalartAllmarasDDES','SpalartAllmarasIDDES','kOmegaSSTDES','kOmegaSSTIDDES'];
 const patchPurposes = [
   ['velocityInlet','速度入口 fixedValue'],['volumetricFlowRateInlet','体積流量入口 flowRateInletVelocity'],['massFlowRateInlet','質量流量入口 flowRateInletVelocity'],['pressureInlet','圧力入口'],['totalPressureInlet','全圧入口'],
-  ['pressureOutlet','圧力出口 fixedValue'],['inletOutlet','逆流許容出口 inletOutlet'],['volumetricFlowRateOutlet','体積流量出口 flowRateOutletVelocity'],['massFlowRateOutlet','質量流量出口 flowRateOutletVelocity'],['outletZeroGradient','出口 zeroGradient'],
+  ['pressureOutlet','圧力出口 fixedValue'],['inletOutlet','逆流許容出口 inletOutlet'],['volumetricFlowRateOutlet','体積流量出口 flowRateOutletVelocity'],['massFlowRateOutlet','質量流量出口 flowRateOutletVelocity'],['outletZeroGradient','出口 U・pゼロ勾配（圧力基準を別途確認）'],
   ['wallNoSlip','壁 noSlip'],['wallSlip','壁 slip'],['movingWall','移動壁 movingWallVelocity'],['roughWall','粗面壁'],['thermalWall','温度固定壁'],
-  ['symmetryPlane','symmetryPlane'],['symmetry','symmetry'],['empty','empty 2D'],['wedge','wedge 軸対称'],['cyclic','cyclic 周期'],['cyclicAMI','cyclicAMI 非一致周期'],['interface','界面/一般patch'],['atmosphere','大気開放/VOF'],['genericPatch','一般patch']
+  ['symmetryPlane','対称平面 symmetryPlane（共通法線）'],['symmetry','対称 symmetry（面ごとの法線）'],['empty','empty 2D（厚み1セル）'],['wedge','wedge 軸対称'],['cyclic','cyclic 周期'],['cyclicAMI','cyclicAMI 非一致周期'],['interface','界面/一般patch'],['atmosphere','大気開放/VOF'],['genericPatch','一般patch']
 ];
 const allFieldTemplates = {
   U:{object:'U', className:'volVectorField', dims:'[0 1 -1 0 0 0 0]', internal:'uniform (0 0 0)', kind:'vector', desc:'速度'},
@@ -1237,7 +1246,7 @@ function init(){
 }
 function bindEvents(){
   document.querySelectorAll('input,select,textarea').forEach(el=>{
-    if(el.type==='file'||['previewText','previewSelect','applicationMirror','geometryFilesPicker','projectPicker','selectionAngle','selectionMode','domainMarginPercent'].includes(el.id)||el.id.startsWith('visual')||el.id.startsWith('viewRotate')) return;
+    if(el.type==='file'||['previewText','previewSelect','applicationMirror','geometryFilesPicker','projectPicker','selectionAngle','selectionMode','domainMarginPercent','foPatchCandidate'].includes(el.id)||el.id.startsWith('visual')||el.id.startsWith('viewRotate')) return;
     el.addEventListener('input',()=>{ if(el.id==='solver') applySolverDefaults(el.value); if(el.id==='material') applyMaterial('material'); if(el.id==='material2') syncSigmaFromVOF(); if(['turbulenceType','rasModel','lesModel'].includes(el.id)) manualFields=null; generate(); });
   });
   $('presetRobust').addEventListener('click',()=>{applyPreset('robust'); generate();});
@@ -1285,7 +1294,7 @@ function addGeometry(g){
   tr.innerHTML=`<td><input data-g="file" class="wide" value="${esc(g.file)}" title="constant/triSurfaceに置く形状ファイル名。選択済みファイルならZIPへ同梱します。"></td>
   <td><input data-g="name" class="wide" value="${esc(g.name)}" title="snappyHexMesh内のgeometry name。patch名のベースにもなります。"></td>
   <td><select data-g="type" title="snappyHexMeshのgeometry type。STLはtriSurfaceMeshを使います。"><option>triSurfaceMesh</option><option>searchableSurfaceWithGaps</option></select></td>
-  <td><select data-g="patchType" title="refinementSurfacesのpatchInfo typeです。壁ならwall、単なる境界ならpatchを選びます。"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option></select></td>
+  <td><select data-g="patchType" title="refinementSurfacesのpatchInfo typeです。壁ならwall、単なる境界ならpatchを選びます。"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option></select></td>
   <td><input data-g="levelMin" class="num" value="${esc(g.levelMin)}" title="この形状の表面refinement最小level"></td>
   <td><input data-g="levelMax" class="num" value="${esc(g.levelMax)}" title="この形状の表面refinement最大level"></td>
   <td><input data-g="featureLevel" class="num" value="${esc(g.featureLevel)}" title="featuresに使う特徴線refinement level。0でfeaturesから除外します。"></td>
@@ -1324,7 +1333,7 @@ function blockMeshGroupedPatches(){
 function blockMeshPatchPurpose(name,type){
   const n=String(name||'').toLowerCase();
   if(type==='empty') return 'empty';
-  if(type==='symmetryPlane') return 'symmetryPlane';
+  if(type==='symmetryPlane'||type==='symmetry') return type;
   if(type==='wedge') return 'wedge';
   if(type==='wall') return 'wallNoSlip';
   if(n.includes('inlet')) return 'velocityInlet';
@@ -1367,7 +1376,7 @@ function setBlockMesh2DXY(){
 function resetPatches(){ $('patchTable').querySelector('tbody').replaceChildren(); managedPatchNames.clear(); }
 function addPatch(p){
   const tbody=$('patchTable').querySelector('tbody'); const tr=document.createElement('tr');
-  tr.innerHTML=`<td><input data-k="name" class="wide" value="${esc(p.name)}" title="polyMesh/boundaryに存在するpatch名"></td>
+  tr.innerHTML=`<td><input data-k="name" class="wide" value="${esc(p.name)}" title="polyMesh/boundaryに存在するpatch名"><small data-patch-source style="display:block;white-space:normal"></small></td>
   <td><select data-k="purpose" class="wide" title="patch用途。0ディレクトリ境界条件の自動割当に使います。">${patchPurposes.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select></td>
   <td><input data-k="U" class="wide" value="${esc(p.U)}" title="固定速度、移動壁速度、または流量境界の初期value推算用"></td>
   <td><input data-k="normal" value="${esc(p.normal)}" title="流量境界の初期速度方向。例: (1 0 0)"></td>
@@ -1379,7 +1388,7 @@ function addPatch(p){
   <td><input data-k="alpha" class="num" value="${esc(p.alpha)}" title="VOF alpha.water。水なら1、空気なら0"></td>
   <td><button class="danger small" data-remove>削除</button></td>`;
   tbody.appendChild(tr); tr.querySelector('[data-k="purpose"]').value=p.purpose;
-  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}if(managedPatchNames.delete(old))managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();}));
+  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;renamePatchReferences(old,el.value);allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}if(managedPatchNames.delete(old))managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();}));
   tr.querySelector('[data-remove]').addEventListener('click',()=>{
     managedPatchNames.delete(tr.dataset.patchName);
     tr.remove();generate();
@@ -1395,13 +1404,13 @@ function flowVelocity(p){ const A=Math.max(Number(p.area)||1,1e-30); const rho=M
 function turbulenceValues(U){ const I=num('turbI',5)/100, Lt=Math.max(num('turbL',0.01),1e-12), Cmu=0.09, nu=Math.max(num('nu',1e-6),1e-20); const k=1.5*(U*I)**2; const epsilon=Math.pow(Cmu,0.75)*Math.pow(Math.max(k,1e-20),1.5)/Lt; const omega=Math.sqrt(Math.max(k,1e-20))/(Math.pow(Cmu,0.25)*Lt); return {k,epsilon,omega,nut:10*nu,nuTilda:10*nu}; }
 function autoFieldKeys(c){ const keys=['U']; if(c.pMode==='p_rgh') keys.push(c.compressible||c.vof?'p_rghDyn':'p_rgh'); else keys.push(c.compressible?'pDyn':'p'); if(c.heatOn) keys.push('T'); const turb=val('turbulenceType'), ras=val('rasModel'), les=val('lesModel'); if(turb==='RAS'){ if(ras.includes('Spalart')) keys.push('nuTilda','nut'); else if(ras.includes('Epsilon')||ras.includes('KE')||ras==='v2f') keys.push('k','epsilon','nut'); else keys.push('k','omega','nut'); } else if(turb==='LES'){ if(les.includes('Spalart')) keys.push('nuTilda','nut'); else if(les.includes('kOmega')) keys.push('k','omega','nut'); else if(les==='kEqn'||les==='dynamicKEqn') keys.push('k','nut'); else keys.push('nut'); } if(c.heatOn) keys.push(c.compressible?'alphatDyn':'alphat'); if(c.compressible&&c.pMode==='p_rgh') keys.push('pDyn'); if(c.vof) keys.push('alphaWater'); return [...new Set(keys)]; }
 function currentFields(){ return manualFields ? [...manualFields] : autoFieldKeys(cfg()); }
-function generate(){ motionPatchCache=new Map(); syncVisualPatches(); const c=cfg(); $('applicationMirror').value=val('solver'); const files=[]; const root=c.caseName; const fieldKeys=currentFields(); files.push({path:`${root}/README_run.md`, text:readme(c,fieldKeys)}); files.push({path:`${root}/system/controlDict`, text:controlDict(c)}); files.push({path:`${root}/system/fvSchemes`, text:fvSchemes(c,fieldKeys)}); files.push({path:`${root}/system/fvSolution`, text:fvSolution(c,fieldKeys)}); files.push({path:`${root}/system/decomposeParDict`, text:decomposeParDict()}); if(checked('includeBlockMesh')) files.push({path:`${root}/system/blockMeshDict`, text:blockMeshDict()}); if(checked('includeSnappy')){ files.push({path:`${root}/system/snappyHexMeshDict`, text:snappyHexMeshDict()}); files.push({path:`${root}/system/surfaceFeatureExtractDict`, text:surfaceFeatureExtractDict()}); } if(c.vof) files.push({path:`${root}/system/setFieldsDict`, text:setFieldsDict(c)}); files.push({path:`${root}/constant/turbulenceProperties`, text:turbulenceProperties()}); if(c.vof) files.push({path:`${root}/constant/transportProperties`, text:vofTransportProperties()}); else if(c.compressible) files.push({path:`${root}/constant/thermophysicalProperties`, text:thermophysicalProperties()}); else files.push({path:`${root}/constant/transportProperties`, text:transportProperties()}); if(c.heatOn||c.vof||c.pMode==='p_rgh'||c.solver.id.includes('buoyant')) files.push({path:`${root}/constant/g`, text:gFile()}); if(c.mode==='cht') files.push({path:`${root}/constant/regionProperties`, text:regionProperties()}); for(const key of fieldKeys){ const f=clone(allFieldTemplates[key]); if(!f) continue; patchFieldInternal(f,c); files.push({path:`${root}/0/${f.object}`, text:fieldFile(f,c)}); } files.push({path:`${root}/Allrun`, text:allrun(c)}); files.push({path:`${root}/Allclean`, text:allclean()}); files.push(...motionFiles(c),...auxiliaryInputFiles(c)); outputs=files; renderFieldChips(fieldKeys); renderOutputs(); if(workbenchReady) updateWorkbenchStatus(); updateAuxiliaryInputsUI(); }
-function patchFieldInternal(f,c){ if(f.object==='p_rgh'&&c.compressible) f.internal='uniform 101325'; if(f.object==='T') f.internal=`uniform ${fmt(num('TRef',293.15))}`; if(f.object==='k') f.internal=`uniform ${fmt(c.turb.k)}`; if(f.object==='epsilon') f.internal=`uniform ${fmt(c.turb.epsilon)}`; if(f.object==='omega') f.internal=`uniform ${fmt(c.turb.omega)}`; if(f.object==='nut') f.internal=`uniform ${fmt(c.turb.nut)}`; if(f.object==='nuTilda') f.internal=`uniform ${fmt(c.turb.nuTilda)}`; }
+function generate(){ motionPatchCache=new Map(); syncVisualPatches(); const c=cfg(); $('applicationMirror').value=val('solver'); const files=[]; const root=c.caseName; const fieldKeys=currentFields(); files.push({path:`${root}/README_run.md`, text:readme(c,fieldKeys)}); files.push({path:`${root}/system/controlDict`, text:controlDict(c)}); files.push({path:`${root}/system/fvSchemes`, text:fvSchemes(c,fieldKeys)}); files.push({path:`${root}/system/fvSolution`, text:fvSolution(c,fieldKeys)}); files.push({path:`${root}/system/decomposeParDict`, text:decomposeParDict()}); if(checked('includeBlockMesh')) files.push({path:`${root}/system/blockMeshDict`, text:blockMeshDict()}); if(checked('includeSnappy')){ files.push({path:`${root}/system/snappyHexMeshDict`, text:snappyHexMeshDict()}); files.push({path:`${root}/system/surfaceFeatureExtractDict`, text:surfaceFeatureExtractDict()}); } if(c.vof) files.push({path:`${root}/system/setFieldsDict`, text:setFieldsDict(c)}); files.push({path:`${root}/constant/turbulenceProperties`, text:turbulenceProperties()}); if(c.vof) files.push({path:`${root}/constant/transportProperties`, text:vofTransportProperties()}); else if(c.compressible) files.push({path:`${root}/constant/thermophysicalProperties`, text:thermophysicalProperties()}); else files.push({path:`${root}/constant/transportProperties`, text:transportProperties()}); if(c.heatOn||c.vof||c.pMode==='p_rgh'||c.solver.id.includes('buoyant')) files.push({path:`${root}/constant/g`, text:gFile()}); if(c.mode==='cht') files.push({path:`${root}/constant/regionProperties`, text:regionProperties()}); for(const key of fieldKeys){ const f=clone(allFieldTemplates[key]); if(!f) continue; patchFieldInternal(f,c); files.push({path:`${root}/0/${f.object}`, text:fieldFile(f,c)}); } files.push({path:`${root}/Allrun`, text:allrun(c)}); files.push({path:`${root}/Allclean`, text:allclean()}); files.push(...motionFiles(c),...auxiliaryInputFiles(c),...runtimeCheckFiles(c,fieldKeys)); outputs=files; renderFieldChips(fieldKeys); renderOutputs(); if(workbenchReady) updateWorkbenchStatus(); updateAuxiliaryInputsUI(); updateCaseChecksUI(); }
+function patchFieldInternal(f,c){ if(f.object==='U')f.internal='uniform '+val('initialU'); if(f.object==='p_rgh'&&c.compressible) f.internal='uniform 101325'; if(f.object==='T') f.internal=`uniform ${fmt(num('TRef',293.15))}`; if(f.object==='k') f.internal=`uniform ${fmt(c.turb.k)}`; if(f.object==='epsilon') f.internal=`uniform ${fmt(c.turb.epsilon)}`; if(f.object==='omega') f.internal=`uniform ${fmt(c.turb.omega)}`; if(f.object==='nut') f.internal=`uniform ${fmt(c.turb.nut)}`; if(f.object==='nuTilda') f.internal=`uniform ${fmt(c.turb.nuTilda)}`; }
 function renderFieldChips(keys){ $('fieldChips').innerHTML=keys.map(k=>`<span class="chip"><b>${esc(allFieldTemplates[k]?.object||k)}</b><span>${esc(allFieldTemplates[k]?.desc||'')}</span><button class="small" data-rm-field="${k}">×</button></span>`).join(''); $('fieldChips').querySelectorAll('[data-rm-field]').forEach(btn=>btn.addEventListener('click',()=>{manualFields=currentFields().filter(k=>k!==btn.dataset.rmField); generate();})); }
 function renderOutputs(){ $('patchEmptyStatus').hidden=!!$('patchTable').querySelector('tbody tr');const errors=blockingErrors(); const msgs=[...errors.map(x=>'エラー: '+x),...validate()]; $('downloadZip').disabled=errors.length>0||importBusy; $('downloadSelected').disabled=errors.length>0; $('copyAll').disabled=errors.length>0; $('validationBox').className='note '+(errors.length?'danger':msgs.some(m=>m.startsWith('注意')||m.startsWith('要確認'))?'warn':'ok'); $('validationBox').innerHTML=msgs.map(esc).join('<br>'); $('pathList').textContent=[...outputs.map(o=>o.path), ...[...selectedGeometryFiles.keys()].map(f=>geometryZipPath(cfg().caseName,f)+'  [binary geometry]')].join('\n'); const prev=selectedPath; $('previewSelect').innerHTML=outputs.map(o=>`<option value="${esc(o.path)}">${esc(o.path)}</option>`).join(''); selectedPath=outputs.find(o=>o.path===prev)?.path||outputs[0]?.path||''; $('previewSelect').value=selectedPath; renderPreview(); }
 function renderPreview(){ $('previewText').value=outputs.find(o=>o.path===selectedPath)?.text||''; }
 function validate(){
-  const c=cfg(), msgs=[];
+  const c=cfg(), msgs=caseInputWarnings(c);
   const names=c.patches.map(p=>p.name); const dup=names.filter((x,i,a)=>a.indexOf(x)!==i);
   if(dup.length) msgs.push('要確認: patch名が重複しています: '+[...new Set(dup)].join(', '));
   if(c.vof&&num('maxAlphaCo',1)>0.3) msgs.push('注意: VOFではmaxAlphaCoを0.1〜0.3程度から始めると安定しやすいです。');
@@ -1462,6 +1471,7 @@ function bcForField(f,p,c){ const cons=constraint(p); if(cons) return cons; cons
     if(pur==='wallNoSlip'||pur==='roughWall'||pur==='movingWall') return zeroGradient();
     return zeroGradient();
   }
+  if(['k','epsilon','omega','nuTilda','T'].includes(o)&&['pressureOutlet','inletOutlet','atmosphere'].includes(pur))return `type inletOutlet;\ninletValue ${f.internal};\nvalue ${f.internal};`;
   if(o==='k'){ if(pur.includes('wall')||pur.includes('Wall')) return `type            kqRWallFunction;\nvalue           ${f.internal};`; if(pur.includes('Inlet')) return `type            fixedValue;\nvalue           ${f.internal};`; return zeroGradient(); }
   if(o==='epsilon'){ if(pur.includes('wall')||pur.includes('Wall')) return `type            epsilonWallFunction;\nvalue           ${f.internal};`; if(pur.includes('Inlet')) return `type            fixedValue;\nvalue           ${f.internal};`; return zeroGradient(); }
   if(o==='omega'){ if(pur.includes('wall')||pur.includes('Wall')) return `type            omegaWallFunction;\nvalue           ${f.internal};`; if(pur.includes('Inlet')) return `type            fixedValue;\nvalue           ${f.internal};`; return zeroGradient(); }
@@ -1492,10 +1502,6 @@ runTimeModifiable ${val('runTimeModifiable')};
 adjustTimeStep  ${val('adjustTimeStep')};
 maxCo           ${val('maxCo')};
 ${c.vof?`maxAlphaCo      ${val('maxAlphaCo')};\n`:''}${maxDelta}
-InfoSwitches
-{
-    level        ${val('infoLevel')};
-}
 
 functions
 {
@@ -1507,7 +1513,7 @@ ${functionObjects(c)}
 function listWords(s){ return String(s||'').trim().split(/[\s,]+/).filter(Boolean); }
 function vecFromDirString(name,fb){ const m=val('foCoeffDirs').match(new RegExp(name+'\\s*=\\s*(\\([^;]+\\))')); return m?m[1]:fb; }
 function functionObjects(c){ const out=[]; const wc=val('foBasicWriteControl'), wi=val('foBasicWriteInterval');
-  if(checked('foResiduals')) out.push(`    residuals1\n    {\n        type            residuals;\n        libs            (utilityFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n        fields          (${listWords(val('foResidualFields')).join(' ')});\n    }`);
+  if(checked('foResiduals')) out.push(`    solverInfo1\n    {\n        type            solverInfo;\n        libs            (utilityFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n        fields          (${residualFieldNames(c).join(' ')});\n    }`);
   if(checked('foCourant')) out.push(`    CourantNo1\n    {\n        type            CourantNo;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n    }`);
   if(checked('foYPlus')&&c.solver.id!=='icoFoam') out.push(`    yPlus1\n    {\n        type            yPlus;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n    }`);
   if(checked('foWallShear')&&c.solver.id!=='icoFoam') out.push(`    wallShearStress1\n    {\n        type            wallShearStress;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n    }`);
@@ -1519,11 +1525,11 @@ function functionObjects(c){ const out=[]; const wc=val('foBasicWriteControl'), 
   if(checked('foFieldAverage')){ const fields=listWords(val('foAverageFields')).map(f=>`            ${f}\n            {\n                mean        on;\n                prime2Mean  ${val('foPrime2Mean')};\n                base        ${val('foAverageBase')};\n            }`).join('\n'); out.push(`    fieldAverage1\n    {\n        type            fieldAverage;\n        libs            (fieldFunctionObjects);\n        writeControl    writeTime;\n        fields\n        (\n${fields}\n        );\n    }`); }
   if(checked('foProbes')) out.push(`    probes1\n    {\n        type            probes;\n        libs            (sampling);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n        fields          (${listWords(val('foProbeFields')).join(' ')});\n        probeLocations\n        (\n${val('foProbeLocations').split('\n').filter(Boolean).map(x=>'            '+x.trim()).join('\n')}\n        );\n    }`);
   if(checked('foSurfaces')) out.push(`    surfaces1\n    {\n        type            surfaces;\n        libs            (sampling);\n        writeControl    writeTime;\n        surfaceFormat   ${val('foSurfaceFormat')};\n        interpolationScheme cellPoint;\n        fields          (${listWords(val('foSurfaceFields')).join(' ')});\n        surfaces\n        (\n            plane1\n            {\n                type        cuttingPlane;\n                planeType   pointAndNormal;\n                pointAndNormalDict\n                {\n                    point   ${val('foPlanePoint')};\n                    normal  ${val('foPlaneNormal')};\n                }\n                interpolate true;\n            }\n        );\n    }`);
-  if(checked('foSurfaceFieldValue')) out.push(`    patchFlux_${val('foSFVPatch')}\n    {\n        type            surfaceFieldValue;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${val('foSFVInterval')};\n        regionType      patch;\n        name            ${val('foSFVPatch')};\n        operation       ${val('foSFVOperation')};\n        fields          (${val('foSFVField')});\n        writeFields     false;\n    }`);
+  out.push('    #include "flowMonitors"');
   if(checked('foVolFieldValue')) out.push(`    volFieldValue1\n    {\n        type            volFieldValue;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n        regionType      ${val('foVFVRegion')};\n${val('foVFVRegion')==='cellZone'?'        name            '+val('foVFVName')+';\n':''}        operation       ${val('foVFVOperation')};\n        fields          (${listWords(val('foVFVFields')).join(' ')});\n        writeFields     false;\n    }`);
   return out.join('\n\n'); }
 function fvSchemes(c,fields){ const ddt=val('timeMode')==='steady'?'steadyState':val('ddtScheme'), scalar=val('divScalarScheme'), Udiv=val('divUScheme'), lap=val('laplacianScheme'), sn=val('snGradScheme'); const has=o=>fields.some(k=>allFieldTemplates[k]?.object===o); const divs=[`    div(phi,U)      ${Udiv};`]; ['k','epsilon','omega','nuTilda','T','alphat'].forEach(s=>{ if(has(s)) divs.push(`    div(phi,${s})     ${scalar};`); }); if(c.compressible) divs.push(`    div(phi,h) ${scalar};`,`    div(phi,e) ${scalar};`,`    div(phi,K) ${scalar};`,`    div(phi,Ekp) ${scalar};`,'    div(phiv,p) Gauss upwind;'); if(c.vof){ divs.push('    div(phi,alpha)  Gauss vanLeer;','    div(phirb,alpha) Gauss interfaceCompression;','    div(rhoPhi,U)   bounded Gauss limitedLinearV 1;'); } divs.push('    div((nuEff*dev2(T(grad(U))))) Gauss linear;','    div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear;'); return header('dictionary','fvSchemes','system')+`ddtSchemes\n{\n    default         ${ddt};\n}\n\ngradSchemes\n{\n    default         Gauss linear;\n    grad(U)         cellLimited Gauss linear 1;\n}\n\ndivSchemes\n{\n    default         none;\n${divs.join('\n')}\n}\n\nlaplacianSchemes\n{\n    default         ${lap};\n}\n\ninterpolationSchemes\n{\n    default         linear;\n}\n\nsnGradSchemes\n{\n    default         ${sn};\n}\n\nwallDist\n{\n    method          meshWave;\n}\n\nfluxRequired\n{\n    default         no;\n    p;\n    p_rgh;\n}\n\n// ************************************************************************* //\n`; }
-function fvSolution(c,fields){ const pressure=c.pMode==='p_rgh'?'p_rgh':'p', steady=val('timeMode')==='steady'; const alphaBlock=c.vof?`\n    "alpha.*"\n    {\n        solver          smoothSolver;\n        smoother        symGaussSeidel;\n        tolerance       1e-8;\n        relTol          0;\n        nAlphaCorr      1;\n        nAlphaSubCycles 2;\n        cAlpha          1;\n        MULESCorr      yes;\n        nLimiterIter   3;\n        ${c.solver.id==='interIsoFoam'?'isoFaceTol 1e-8;\n        surfCellTol 1e-8;\n        nAlphaBounds 3;\n        snapTol 1e-12;\n        reconstructionScheme isoAlpha;\n        clip true;':''}\n    }\n`:''; const algo=steady?`SIMPLE\n{\n    nNonOrthogonalCorrectors ${val('nNonOrth')};\n    consistent       yes;\n    pRefCell 0;\n    pRefValue 0;\n    residualControl\n    {\n        p             1e-4;\n        U             1e-5;\n        "(k|epsilon|omega|nuTilda|T)" 1e-5;\n    }\n}\n\nrelaxationFactors\n{\n    fields { p 0.3; p_rgh 0.3; }\n    equations { U 0.7; "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)" 0.7; }\n}\n`:`${c.solver.id==='icoFoam'?'PISO':'PIMPLE'}\n{\n    momentumPredictor yes;\n    nOuterCorrectors ${val('nOuter')};\n    correctPhi yes;\n    checkMeshCourantNo yes;\n    nCorrectors     ${val('nCorrectors')};\n    nNonOrthogonalCorrectors ${val('nNonOrth')};\n    pRefCell        0;\n    pRefValue       0;\n    residualControl\n    {\n        ${pressure}   1e-4;\n        U             1e-5;\n    }\n}\n`; return header('dictionary','fvSolution','system')+`solvers\n{\n    ${pressure}\n    {\n        solver          GAMG;\n        tolerance       ${val('pTol')};\n        relTol          ${val('pRelTol')};\n        smoother        GaussSeidel;\n        cacheAgglomeration true;\n        agglomerator    faceAreaPair;\n        nCellsInCoarsestLevel 20;\n        mergeLevels     1;\n    }\n\n    ${pressure}Final\n    {\n        \$${pressure};\n        relTol          0;\n    }\n\n    U\n    {\n        solver          smoothSolver;\n        smoother        symGaussSeidel;\n        tolerance       ${val('fieldTol')};\n        relTol          0.1;\n    }\n\n    UFinal\n    {\n        \$U;\n        relTol          0;\n    }\n\n    "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)"\n    {\n        \$U;\n    }\n\n    "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)Final"\n    {\n        \$U;\n        relTol          0;\n    }\n    pcorr\n    {\n        $${pressure};\n        relTol 0;\n    }\n    pcorrFinal { $pcorr; }\n${alphaBlock}}\n\n${algo}// ************************************************************************* //\n`; }
+function fvSolution(c,fields){ const pressure=c.pMode==='p_rgh'?'p_rgh':'p', steady=c.solver.time==='steady'; const alphaBlock=c.vof?`\n    "alpha.*"\n    {\n        solver          smoothSolver;\n        smoother        symGaussSeidel;\n        tolerance       1e-8;\n        relTol          0;\n        nAlphaCorr      1;\n        nAlphaSubCycles 2;\n        cAlpha          1;\n        MULESCorr      yes;\n        nLimiterIter   3;\n        ${c.solver.id==='interIsoFoam'?'isoFaceTol 1e-8;\n        surfCellTol 1e-8;\n        nAlphaBounds 3;\n        snapTol 1e-12;\n        reconstructionScheme isoAlpha;\n        clip true;':''}\n    }\n`:''; const algo=steady?`SIMPLE\n{\n    nNonOrthogonalCorrectors ${val('nNonOrth')};\n    consistent       yes;\n    pRefCell 0;\n    pRefValue 0;\n    residualControl\n    {\n        ${pressure}   1e-4;\n        U             1e-5;\n        "(k|epsilon|omega|nuTilda|T)" 1e-5;\n    }\n}\n\nrelaxationFactors\n{\n    fields { p 0.3; p_rgh 0.3; }\n    equations { U 0.7; "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)" 0.7; }\n}\n`:`${c.solver.id==='icoFoam'?'PISO':'PIMPLE'}\n{\n    momentumPredictor yes;\n    nOuterCorrectors ${val('nOuter')};\n    correctPhi yes;\n    checkMeshCourantNo yes;\n    nCorrectors     ${val('nCorrectors')};\n    nNonOrthogonalCorrectors ${val('nNonOrth')};\n    pRefCell        0;\n    pRefValue       0;\n    ${c.solver.id==='icoFoam'?'':'residualControl\n    {\n        '+pressure+' { tolerance 1e-4; relTol 0; }\n        U { tolerance 1e-5; relTol 0; }\n    }'}\n}\n`; return header('dictionary','fvSolution','system')+`solvers\n{\n    ${pressure}\n    {\n        solver          GAMG;\n        tolerance       ${val('pTol')};\n        relTol          ${val('pRelTol')};\n        smoother        GaussSeidel;\n        cacheAgglomeration true;\n        agglomerator    faceAreaPair;\n        nCellsInCoarsestLevel 20;\n        mergeLevels     1;\n    }\n\n    ${pressure}Final\n    {\n        \$${pressure};\n        relTol          0;\n    }\n\n    U\n    {\n        solver          smoothSolver;\n        smoother        symGaussSeidel;\n        tolerance       ${val('fieldTol')};\n        relTol          0.1;\n    }\n\n    UFinal\n    {\n        \$U;\n        relTol          0;\n    }\n\n    "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)"\n    {\n        \$U;\n    }\n\n    "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)Final"\n    {\n        \$U;\n        relTol          0;\n    }\n    pcorr\n    {\n        $${pressure};\n        relTol 0;\n    }\n    pcorrFinal { $pcorr; }\n${alphaBlock}}\n\n${algo}// ************************************************************************* //\n`; }
 function turbulenceProperties(){ const t=val('turbulenceType'); let body=`simulationType  ${t};\n`; if(t==='RAS') body+=`\nRAS\n{\n    RASModel        ${val('rasModel')};\n    turbulence      on;\n    printCoeffs     on;\n}\n`; if(t==='LES') body+=`\nLES\n{\n    LESModel        ${val('lesModel')};\n    turbulence      on;\n    printCoeffs     on;\n    delta           cubeRootVol;\n}\n`; return header('dictionary','turbulenceProperties','constant')+body+'\n// ************************************************************************* //\n'; }
 function transportProperties(){ return header('dictionary','transportProperties','constant')+`transportModel  Newtonian;\n\nnu              [0 2 -1 0 0 0 0] ${fmt(num('nu',1e-6))};\nrho             [1 -3 0 0 0 0 0] ${fmt(num('rho',1000))};\nbeta            [0 0 0 -1 0 0 0] ${fmt(num('beta',0.0034))};\nTRef            [0 0 0 1 0 0 0] ${fmt(num('TRef',293.15))};\nPr              [0 0 0 0 0 0 0] ${fmt(num('Pr',0.71))};\nPrt             [0 0 0 0 0 0 0] ${fmt(num('Prt',0.85))};\n\n// ************************************************************************* //\n`; }
 function vofTransportProperties(){ const m1=materials[val('material')]||materials.water20, m2=materials[val('material2')]||materials.air20; const ph1='water',ph2='air'; return header('dictionary','transportProperties','constant')+`phases          (${ph1} ${ph2});\n\n${ph1}\n{\n    transportModel  Newtonian;\n    nu              [0 2 -1 0 0 0 0] ${fmt(num('nu',1e-6))};\n    rho             [1 -3 0 0 0 0 0] ${fmt(num('rho',1000))};\n}\n\n${ph2}\n{\n    transportModel  Newtonian;\n    nu              [0 2 -1 0 0 0 0] ${fmt(m2.nu||1.5e-5)};\n    rho             [1 -3 0 0 0 0 0] ${fmt(m2.rho||1.2)};\n}\n\nsigma           [1 0 -2 0 0 0 0] ${fmt(num('sigma',0.072))};\n\n// ************************************************************************* //\n`; }
@@ -1610,7 +1616,7 @@ castellatedMeshControls
     maxGlobalCells 2000000;
     minRefinementCells 0;
     maxLoadUnbalance 0.10;
-    nCellsBetweenLevels 3;
+    nCellsBetweenLevels ${val('nCellsBetweenLevels')};
 
     features
     (
@@ -1631,8 +1637,8 @@ ${surfaceEntries || '        // No refinement surfaces'}
 snapControls
 {
     nSmoothPatch 3;
-    tolerance 2.0;
-    nSolveIter 30;
+    tolerance ${val('snapTolerance')};
+    nSolveIter ${val('snapSolveIter')};
     nRelaxIter 5;
     nFeatureSnapIter 10;
     implicitFeatureSnap false;
@@ -1642,15 +1648,15 @@ snapControls
 
 addLayersControls
 {
-    relativeSizes true;
+    relativeSizes ${val('layerRelativeSizes')};
     layers
     {
 ${layerEntries || '        // layers disabled for all geometry rows'}
         // Named STL regions are mapped to the boundary-condition table.
     }
-    expansionRatio 1.2;
+    expansionRatio ${val('layerExpansionRatio')};
     finalLayerThickness ${val('finalLayerThickness')};
-    minThickness 0.05;
+    minThickness ${val('layerMinThickness')};
     nGrow 0;
     featureAngle 60;
     nRelaxIter 5;
@@ -1668,7 +1674,6 @@ meshQualityControls
 {
     #includeEtc "caseDicts/mesh/generation/meshQualityDict.cfg"
     // v2412: cfg includes nSmoothScale and errorReduction required during snap.
-    relaxed { maxNonOrtho 75; }
 }
 
 writeFlags (scalarLevels layerSets layerFields);
@@ -1713,6 +1718,155 @@ function crc32(bytes){ let c=0xffffffff; for(const b of bytes) c=crcTable[(c^b)&
 function dosDateTime(d=new Date()){ const time=((d.getHours()&31)<<11)|((d.getMinutes()&63)<<5)|((Math.floor(d.getSeconds()/2))&31); const date=(((d.getFullYear()-1980)&127)<<9)|(((d.getMonth()+1)&15)<<5)|(d.getDate()&31); return {time,date}; }
 function u16(a,n){ a.push(n&255,(n>>>8)&255); } function u32(a,n){ a.push(n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255); } function bytesOf(s){ return new TextEncoder().encode(s); } function append(a,b){ for(const x of b) a.push(x); }
 function makeZip(files){ const out=[],central=[]; let offset=0; const dt=dosDateTime(); for(const f of files){ const name=bytesOf(f.name.replace(/^\/+/,'')), data=(f.bytes instanceof Uint8Array ? f.bytes : bytesOf(f.text||'')), crc=crc32(data), local=[]; u32(local,0x04034b50); u16(local,20); u16(local,0x0800); u16(local,0); u16(local,dt.time); u16(local,dt.date); u32(local,crc); u32(local,data.length); u32(local,data.length); u16(local,name.length); u16(local,0); append(local,name); append(local,data); append(out,local); const c=[]; u32(c,0x02014b50); u16(c,20); u16(c,20); u16(c,0x0800); u16(c,0); u16(c,dt.time); u16(c,dt.date); u32(c,crc); u32(c,data.length); u32(c,data.length); u16(c,name.length); u16(c,0); u16(c,0); u16(c,0); u16(c,0); u32(c,0); u32(c,offset); append(c,name); append(central,c); offset+=local.length; } const cdOffset=offset, cdSize=central.length; append(out,central); const e=[]; u32(e,0x06054b50); u16(e,0); u16(e,0); u16(e,files.length); u16(e,files.length); u32(e,cdSize); u32(e,cdOffset); u16(e,0); append(out,e); return new Blob([new Uint8Array(out)],{type:'application/zip'}); }
+const runtimeCheckScript = "#!/usr/bin/env python3\n\"\"\"Validate a freshly checked OpenCFD v2412 mesh before decomposition/solving.\n\nEmitted into each generated case as scripts/validate_case.py. Python 3 standard\nlibrary only; foamDictionary handles native field formats and include expansion.\nThis checks setup consistency, not physical validation or long-time stability.\n\"\"\"\nimport datetime\nimport gzip\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport re\nimport subprocess\nimport sys\n\nCONSTRAINTS = {\"symmetry\", \"symmetryPlane\", \"empty\", \"wedge\", \"cyclic\", \"cyclicAMI\"}\nPRESSURE_TYPES = {\"fixedValue\", \"totalPressure\", \"prghPressure\", \"prghTotalPressure\", \"uniformFixedValue\"}\nFLOW_INLETS = {\"velocityInlet\", \"volumetricFlowRateInlet\", \"massFlowRateInlet\"}\nFLOW_OUTLETS = {\"volumetricFlowRateOutlet\", \"massFlowRateOutlet\"}\n\n\ndef tokens(text):\n    # Retain quoted words and remove comments only outside quotes.\n    pattern = r'\"(?:\\\\.|[^\"\\\\])*\"|/\\*[\\s\\S]*?\\*/|//[^\\n]*|[{}();\\[\\]]|[^\\s{}();\\[\\]\"]+'\n    return [t for t in re.findall(pattern, text) if not t.startswith((\"//\", \"/*\"))]\n\n\ndef word(token):\n    return token[1:-1] if token.startswith('\"') and token.endswith('\"') else token\n\n\ndef dictionary(seq, pos=0, enclosed=True):\n    if enclosed:\n        if pos >= len(seq) or seq[pos] != \"{\":\n            raise ValueError(\"Expected a dictionary\")\n        pos += 1\n    result = {}\n    while pos \u003c len(seq):\n        if seq[pos] == \"}\":\n            if not enclosed:\n                raise ValueError(\"Unexpected closing dictionary\")\n            return result, pos + 1\n        key = word(seq[pos])\n        pos += 1\n        if key.startswith((\"#\", \"$\")):\n            raise ValueError(\"Unexpanded dictionary directive: \" + key)\n        if key in result:\n            raise ValueError(\"Duplicate dictionary key: \" + key)\n        if pos \u003c len(seq) and seq[pos] == \"{\":\n            result[key], pos = dictionary(seq, pos)\n            if pos \u003c len(seq) and seq[pos] == \";\":\n                pos += 1\n        else:\n            value, depth = [], 0\n            while pos \u003c len(seq):\n                t = seq[pos]\n                pos += 1\n                if t == \";\" and depth == 0:\n                    break\n                if t in (\"(\", \"[\"):\n                    depth += 1\n                elif t in (\")\", \"]\"):\n                    depth -= 1\n                if depth \u003c 0 or (t == \"}\" and depth == 0):\n                    raise ValueError(\"Malformed dictionary value: \" + key)\n                value.append(t)\n            else:\n                raise ValueError(\"Unterminated dictionary entry: \" + key)\n            result[key] = \" \".join(value)\n    if enclosed:\n        raise ValueError(\"Unclosed dictionary\")\n    return result, pos\n\n\ndef parse_dictionary(text):\n    seq = tokens(text)\n    if not seq:\n        raise ValueError(\"Empty dictionary output\")\n    result, end = dictionary(seq, enclosed=seq[0] == \"{\")\n    if seq[end:] not in ([], [\";\"]):\n        raise ValueError(\"Unexpected trailing dictionary output\")\n    return result\n\n\ndef existing_file(path):\n    if path.is_file():\n        return path\n    zipped = Path(str(path) + \".gz\")\n    return zipped if zipped.is_file() else None\n\n\ndef read_text(path):\n    data = gzip.decompress(path.read_bytes()) if path.suffix == \".gz\" else path.read_bytes()\n    return data.decode(\"utf-8\")\n\n\ndef boundary_patches(path):\n    # polyBoundaryMesh is a list of textual patch dictionaries even when the\n    # mesh points/faces use binary format. Compressed boundary files are accepted.\n    seq = tokens(read_text(path))\n    pos = 0\n    if seq and seq[0] == \"FoamFile\":\n        _, pos = dictionary(seq, 1)\n    if pos + 1 >= len(seq) or not seq[pos].isdigit() or seq[pos + 1] != \"(\":\n        raise ValueError(\"Cannot read polyMesh/boundary patch list\")\n    count, pos = int(seq[pos]), pos + 2\n    patches = {}\n    for _ in range(count):\n        name = word(seq[pos])\n        values, pos = dictionary(seq, pos + 1)\n        if name in patches:\n            raise ValueError(\"Duplicate mesh patch: \" + name)\n        nfaces = int(values[\"nFaces\"])\n        if nfaces \u003c 0:\n            raise ValueError(\"Negative face count: \" + name)\n        patches[name] = {\"type\": values[\"type\"], \"nFaces\": nfaces}\n    if seq[pos:] not in ([\")\"], [\")\", \";\"]):\n        raise ValueError(\"Incomplete or extra polyMesh/boundary entries\")\n    return patches\n\n\ndef foam_value(case, path, entry):\n    proc = subprocess.run([\"foamDictionary\", str(path), \"-entry\", entry, \"-value\"], cwd=case,\n                          capture_output=True, text=True, timeout=60)\n    if proc.returncode:\n        raise ValueError(f\"foamDictionary failed: {path} / {entry}\\n{proc.stderr.strip()}\")\n    return proc.stdout.strip()\n\n\ndef initial_time(case):\n    mode = foam_value(case, \"system/controlDict\", \"startFrom\")\n    times = []\n    for directory in case.iterdir():\n        if directory.is_dir() and re.fullmatch(r\"[+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?\", directory.name):\n            times.append((float(directory.name), directory.name))\n    times.sort()\n    if mode in (\"latestTime\", \"firstTime\"):\n        if not times:\n            raise ValueError(\"No time directories for \" + mode)\n        return times[-1 if mode == \"latestTime\" else 0][1]\n    if mode != \"startTime\":\n        raise ValueError(\"Unsupported startFrom: \" + mode)\n    target = float(foam_value(case, \"system/controlDict\", \"startTime\"))\n    found = [name for value, name in times if value == target]\n    if len(found) != 1:\n        raise ValueError(f\"Exactly one initial-field directory is required at startTime={target}\")\n    return found[0]\n\n\ndef mesh_files(case, time_name):\n    instances = []\n    for directory in case.iterdir():\n        try:\n            value = float(directory.name)\n        except ValueError:\n            continue\n        if directory.is_dir() and value \u003c= float(time_name):\n            instances.append((value, directory.name))\n    roots = [case / name / \"polyMesh\" for _, name in sorted(instances, reverse=True)]\n    roots.append(case / \"constant/polyMesh\")\n    result = {}\n    for name in (\"points\", \"faces\", \"owner\", \"neighbour\", \"boundary\"):\n        found = next((p for root in roots if (p := existing_file(root / name))), None)\n        if found is None:\n            raise ValueError(\"Missing mesh file: \" + name)\n        result[name] = found\n    return result\n\n\ndef fingerprint(case, files):\n    result = {}\n    for name, path in files.items():\n        digest = hashlib.sha256()\n        with path.open(\"rb\") as stream:\n            for block in iter(lambda: stream.read(1024 * 1024), b\"\"):\n                digest.update(block)\n        result[name] = {\"path\": str(path.relative_to(case)), \"sha256\": digest.hexdigest()}\n    return result\n\n\ndef quality_errors(log, returncode):\n    errors = []\n    if returncode != 0:\n        errors.append(f\"checkMesh returned {returncode}; see log.checkMesh\")\n    if re.search(r\"Failed\\s+\\d+\\s+mesh checks\", log):\n        errors.append(\"checkMesh reports failed mesh checks; inspect concaveCells/concaveFaces and log.checkMesh\")\n    if not re.search(r\"^\\s*Mesh OK\\.\\s*$\", log, re.M):\n        errors.append(\"checkMesh success marker 'Mesh OK.' was not found\")\n    if not re.search(r\"^\\s*End\\s*$\", log, re.M) or re.search(r\"FOAM FATAL|FOAM exiting|Segmentation fault\", log):\n        errors.append(\"Normal checkMesh completion could not be confirmed\")\n    return errors\n\n\ndef type_of(entry):\n    return entry.get(\"type\", \"\") if isinstance(entry, dict) else \"\"\n\n\ndef field_patch(boundary, name):\n    # Generated fields use exact names. A native foamDictionary expansion has\n    # already resolved includes; support explicit regex entries for hand edits.\n    if name in boundary:\n        return boundary[name]\n    matches = []\n    for pattern, value in boundary.items():\n        try:\n            if re.fullmatch(pattern, name):\n                matches.append(value)\n        except re.error:\n            pass\n    if len(matches) > 1:\n        raise ValueError(\"Ambiguous boundaryField patterns for \" + name)\n    return matches[0] if matches else None\n\n\ndef boundary_errors(config, active, fields, internal_u):\n    errors, notes = [], []\n    settings = {p[\"name\"]: p for p in config[\"patches\"]}\n    for name, mesh in active.items():\n        if name not in settings:\n            errors.append(f\"Actual mesh patch {name} is not registered in the builder; assign its intended condition\")\n        for field, boundary in fields.items():\n            entry = field_patch(boundary, name)\n            if entry is None:\n                errors.append(f\"{field}: no boundaryField entry for actual patch {name}\")\n                continue\n            if mesh[\"type\"] in CONSTRAINTS and type_of(entry) != mesh[\"type\"]:\n                errors.append(f\"{name}: mesh type {mesh['type']} disagrees with {field} type {type_of(entry)}\")\n            if type_of(entry) in CONSTRAINTS and type_of(entry) != mesh[\"type\"]:\n                errors.append(f\"{name}: {field} constraint {type_of(entry)} requires matching mesh type\")\n        if name in settings:\n            purpose = settings[name][\"purpose\"]\n            expected = purpose if purpose in CONSTRAINTS else \"wall\" if \"wall\" in purpose.lower() else \"patch\"\n            if mesh[\"type\"] != expected:\n                errors.append(f\"{name}: registered purpose {purpose} requires mesh type {expected}, found {mesh['type']}\")\n    pressure = fields.get(config[\"pressure\"], {})\n    fixed = [name for name in active if type_of(field_patch(pressure, name)) in PRESSURE_TYPES]\n    notes.append(\"Active pressure-reference patches: \" + (\", \".join(fixed) or \"none\"))\n    if not config[\"compressible\"] and not fixed:\n        vector = re.fullmatch(r\"uniform\\s*\\(([^()]*)\\)\", internal_u)\n        components = [float(x) for x in vector[1].split()] if vector else []\n        zero = len(components) == 3 and all(x == 0 for x in components)\n        inlets = [p for name, p in settings.items() if name in active and p[\"purpose\"] in FLOW_INLETS and (p.get(\"inletFlow\") or 0) > 1e-14]\n        outlets = [p for name, p in settings.items() if name in active and p[\"purpose\"] in FLOW_OUTLETS]\n        qin = sum(p[\"inletFlow\"] for p in inlets)\n        qout = sum(float(p[\"Q\"]) if p[\"purpose\"] == \"volumetricFlowRateOutlet\" else float(p[\"mdot\"]) / config[\"rho\"] for p in outlets)\n        balanced = qout > 0 and abs(qin - qout) \u003c= 1e-6 * max(qin, qout)\n        if zero and inlets and not balanced:\n            errors.append(\"Nonzero inflow at \" + \", \".join(p[\"name\"] for p in inlets) +\n                          \" with zero internal U and no active pressure boundary / balanced prescribed outflow. \"\n                          \"A background outlet with zero faces cannot provide a pressure condition. \"\n                          \"Review the actual outlet pressure and initialization; pRefCell does not create outflow.\")\n        elif inlets:\n            notes.append(\"Pure-Neumann pressure: verify flux compatibility and initialization; the reference cell only fixes the pressure gauge\")\n    return errors, notes\n\n\ndef flow_selection(config, active):\n    flow = config[\"flow\"]\n    if not flow[\"enabled\"]:\n        return [], [], []\n    names, errors, notes = [], [], []\n    for name in flow[\"names\"]:\n        if not re.fullmatch(r\"[A-Za-z_][A-Za-z0-9_]*\", name):\n            errors.append(\"Invalid flow monitor patch name: \" + name)\n        elif name in active:\n            names.append(name)\n        elif flow[\"mode\"] == \"manual\":\n            errors.append(\"Flow monitor patch missing or has zero faces: \" + name + \"; active patches: \" + \", \".join(active))\n        else:\n            notes.append(\"Automatic flow monitor omitted absent/zero-face patch: \" + name)\n    if flow[\"mode\"] == \"manual\" and not flow[\"names\"]:\n        errors.append(\"Manual flow monitoring requires at least one patch\")\n    return names, errors, notes\n\n\ndef flow_dictionary(flow, names):\n    def obj(name, patches, operation):\n        region = \"name \" + patches[0] if len(patches) == 1 else \"names (\" + \" \".join(patches) + \")\"\n        return (f\"{name}\\n{{\\n    type surfaceFieldValue;\\n    libs (fieldFunctionObjects);\\n\"\n                f\"    writeControl {flow['writeControl']};\\n    writeInterval {flow['writeInterval']};\\n\"\n                f\"    regionType patch;\\n    {region};\\n    operation {operation};\\n\"\n                f\"    fields ({flow['field']});\\n    writeFields false;\\n}}\\n\")\n    result = \"// Resolved by validate_case.py against nonempty actual mesh patches.\\n\"\n    result += \"\\n\".join(obj(\"patchFlux_\" + n, [n], flow[\"operation\"]) for n in names)\n    if len(names) > 1 and flow[\"operation\"] == \"sum\":\n        result += obj(\"flowBalance\", names, \"sum\")\n    return result\n\n\ndef validate(case):\n    report = {\"started\": datetime.datetime.now(datetime.timezone.utc).isoformat(), \"errors\": [], \"notes\": []}\n    errors, notes = report[\"errors\"], report[\"notes\"]\n    (case / \"case-check-report.json\").write_text(json.dumps({**report, \"passed\": False, \"inProgress\": True}, indent=2) + \"\\n\")\n    try:\n        if os.environ.get(\"WM_PROJECT_VERSION\") != \"v2412\":\n            raise ValueError(\"Source OpenCFD OpenFOAM v2412 before checking this case\")\n        config = json.loads((case / \"system/caseBuilderChecks.json\").read_text())\n        start = initial_time(case)\n        files = mesh_files(case, start)\n        report[\"time\"] = start\n        report[\"meshBefore\"] = fingerprint(case, files)\n        command = [\"checkMesh\", \"-time\", start, \"-allTopology\", \"-allGeometry\", \"-writeSets\", \"vtk\", \"-noFunctionObjects\"]\n        report[\"command\"] = command\n        # Open with 'w' on EVERY run; never accept a RunFunctions-cached log.\n        with (case / \"log.checkMesh\").open(\"w\") as log:\n            proc = subprocess.run(command, cwd=case, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)\n        log = (case / \"log.checkMesh\").read_text(errors=\"replace\")\n        report[\"openfoamHeader\"] = [line.strip() for line in log.splitlines() if re.match(r\"\\s*(Build|Version|Arch|Exec)\\s*:\", line)]\n        errors.extend(quality_errors(log, proc.returncode))\n        report[\"meshAfter\"] = fingerprint(case, mesh_files(case, start))\n        if report[\"meshBefore\"] != report[\"meshAfter\"]:\n            errors.append(\"The mesh changed during checkMesh; this result cannot authorize a solver run\")\n        report[\"qualitySummary\"] = [line.strip() for line in log.splitlines() if re.search(r\"concave|non-orthogon|skewness|Failed|Mesh OK\", line, re.I)]\n        patches = boundary_patches(files[\"boundary\"])\n        active = {name: p for name, p in patches.items() if p[\"nFaces\"] > 0}\n        if not active:\n            errors.append(\"No nonempty mesh patches found\")\n        report[\"patches\"] = patches\n        fields = {}\n        for field in config[\"fields\"]:\n            if not existing_file(case / start / field):\n                errors.append(f\"Missing initial field: {start}/{field}\")\n                continue\n            try:\n                fields[field] = parse_dictionary(foam_value(case, start + \"/\" + field, \"boundaryField\"))\n            except ValueError as error:\n                errors.append(str(error))\n        internal_u = foam_value(case, start + \"/U\", \"internalField\") if \"U\" in fields else \"\"\n        found_errors, found_notes = boundary_errors(config, active, fields, internal_u)\n        errors.extend(found_errors)\n        notes.extend(found_notes)\n        names, found_errors, found_notes = flow_selection(config, active)\n        errors.extend(found_errors)\n        notes.extend(found_notes)\n        report[\"flowPatches\"] = names\n        for pattern in config[\"forcePatches\"]:\n            try:\n                matched = any(re.fullmatch(pattern, n) for n in active)\n            except re.error:\n                matched = False\n            if not matched:\n                errors.append(\"Force monitor has no nonempty matching patch: \" + pattern)\n        if any(p[\"type\"] == \"empty\" for p in active.values()) and not re.search(r\"Mesh has\\s+2\\s+geometric\", log):\n            errors.append(\"empty patches require a verified two-dimensional mesh; checkMesh did not confirm 2 geometric directions\")\n        algorithm = \"SIMPLE\" if config[\"solver\"] == \"simpleFoam\" else \"PISO\" if config[\"solver\"] == \"icoFoam\" else \"PIMPLE\"\n        solution = parse_dictionary(foam_value(case, \"system/fvSolution\", algorithm))\n        if algorithm == \"PIMPLE\":\n            for field, entry in solution.get(\"residualControl\", {}).items():\n                if not isinstance(entry, dict) or not {\"tolerance\", \"relTol\"} \u003c= entry.keys():\n                    errors.append(\"PIMPLE residualControl requires tolerance/relTol dictionary for \" + field)\n        if not errors:\n            # Only automatic monitoring selection is resolved, never patch purposes\n            # or initial conditions. Manual missing references have already failed.\n            target = case / \"system/flowMonitors\"\n            target.write_text(flow_dictionary(config[\"flow\"], names))\n            # Native parsing also checks the included flow monitor dictionary.\n            functions = parse_dictionary(foam_value(case, \"system/controlDict\", \"functions\"))\n            if config[\"residualFields\"] and type_of(functions.get(\"solverInfo1\")) != \"solverInfo\":\n                errors.append(\"Residual monitoring requires type solverInfo in OpenCFD v2412\")\n            elif config[\"residualFields\"]:\n                allowed = set(config[\"fields\"]) & {config[\"pressure\"], \"U\", \"k\", \"epsilon\", \"omega\", \"nuTilda\"}\n                if config[\"compressible\"]:\n                    allowed.add(\"h\")\n                elif config[\"solver\"] == \"buoyantBoussinesqPimpleFoam\":\n                    allowed.add(\"T\")\n                selected = [word(t) for t in tokens(functions[\"solverInfo1\"].get(\"fields\", \"\")) if t not in (\"(\", \")\")]\n                if not selected:\n                    errors.append(\"solverInfo requires at least one monitored field\")\n                for field in selected:\n                    if field not in allowed:\n                        errors.append(\"solverInfo field is not solved in this case: \" + field)\n    except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError) as error:\n        errors.append(str(error))\n    report[\"passed\"] = not errors\n    (case / \"case-check-report.json\").write_text(json.dumps(report, indent=2) + \"\\n\")\n    for note in notes:\n        print(\"CHECK: \" + note)\n    for error in errors:\n        print(\"ERROR: \" + error, file=sys.stderr)\n    print(\"Case checks \" + (\"passed\" if not errors else \"FAILED\") + \"; see case-check-report.json and log.checkMesh\")\n    return 1 if errors else 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(validate(Path(__file__).resolve().parents[1]))\n";
+// Checks shared by the input UI and the generated runtime-check manifest.
+const flowPurposes=new Set(['velocityInlet','volumetricFlowRateInlet','massFlowRateInlet','pressureInlet','totalPressureInlet','pressureOutlet','inletOutlet','volumetricFlowRateOutlet','massFlowRateOutlet','outletZeroGradient','atmosphere']);
+const pressurePurposes=new Set(['pressureInlet','totalPressureInlet','pressureOutlet','atmosphere']);
+const fixedInletPurposes=new Set(['velocityInlet','volumetricFlowRateInlet','massFlowRateInlet']);
+function patchSources(){
+  const sources=new Map(),put=(name,source)=>{if(!sources.has(name))sources.set(name,[]);sources.get(name).push(source);};
+  for(const g of blockMeshGroupedPatches())put(g.name,{kind:'background',label:'背景 '+g.axes.join('/'),active:checked('includeBlockMesh')});
+  for(const part of geometryParts.values())for(const name of new Set(part.faces.map(f=>f.patch)))put(name,{kind:'stl',label:'STL '+part.file,active:checked('includeSnappy')});
+  if(val('meshMotion')==='ami')for(const name of ['rotorAMI','statorAMI'])put(name,{kind:'ami',label:'回転AMI',active:true});
+  return sources;
+}
+function residualFieldCandidates(c=cfg()){
+  const objects=currentFields().map(k=>allFieldTemplates[k].object),pressure=c.pMode==='p_rgh'?'p_rgh':'p';
+  return [pressure,'U',...(c.compressible?['h']:c.heatOn?['T']:[]),'k','epsilon','omega','nuTilda'].filter(f=>objects.includes(f)||(f==='h'&&c.compressible));
+}
+function residualFieldNames(c=cfg()){return val('foResidualMode')==='auto'?residualFieldCandidates(c):listWords(val('foResidualFields'));}
+function fluxPatchNames(){
+  if(val('foSFVMode')==='manual')return [...new Set(listWords(val('foSFVPatch')))];
+  const sources=patchSources();return getPatches().filter(p=>flowPurposes.has(p.purpose)&&(!sources.has(p.name)||sources.get(p.name).some(s=>s.active))).map(p=>p.name);
+}
+function renamePatchReferences(oldName,newName){
+  if(oldName===newName)return;
+  for(const id of ['foSFVPatch','foForcePatches','nonRotatingPatches'])$(id).value=listWords(val(id)).map(n=>n===oldName?newName:n).join(' ');
+}
+function layerTotals(n){
+  const final=Number(val('finalLayerThickness')),r=Number(val('layerExpansionRatio'));
+  const first=final/Math.pow(r,n-1);let total=0;for(let i=0;i<n;i++)total+=final/Math.pow(r,i);
+  return {first,final,total};
+}
+function layeredPatches(){
+  const patches=getPatches();return getGeometries().filter(g=>Number(g.layers)>0).flatMap(g=>geometryPatchNames(g).filter(name=>purposeType(patches.find(p=>p.name===name)?.purpose||'wallNoSlip')==='wall').map(name=>({name,n:Number(g.layers)})));
+}
+function planarPatch(faces){
+  if(!faces.length)return true;
+  const b=Geometry.bounds(faces),tol=Math.max(Math.hypot(...Geometry.sub(b.max,b.min))*1e-6,1e-12),first=faces[0];
+  return faces.every(f=>Geometry.dot(f.n,first.n)>1-1e-8&&f.v.every(v=>Math.abs(Geometry.dot(Geometry.sub(v,first.v[0]),first.n))<=tol));
+}
+function patchMeasurement(p){
+  const faces=allFaces().filter(f=>f.patch===p.name),scale=num('stlScale');
+  if(faces.length){let area=0;const areaVector=[0,0,0];for(const f of faces){const a=Geometry.cross(Geometry.sub(f.v[1],f.v[0]),Geometry.sub(f.v[2],f.v[0])).map(x=>x*.5*scale*scale);area+=Math.hypot(...a);a.forEach((x,i)=>areaVector[i]+=x);}return {area,areaVector,source:'STL面'};}
+  const b=backgroundMeshBounds(),defs=blockMeshFaceDefs().filter(f=>f.name===p.name);
+  if(b&&defs.length){const ext=Geometry.sub(b.max,b.min),areaVector=[0,0,0];let area=0;for(const f of defs){const i='XYZ'.indexOf(f.axis[0]),a=ext.filter((_,j)=>j!==i).reduce((x,y)=>x*y,1);area+=a;areaVector[i]+=a*(f.axis[1]==='+'?1:-1);}return {area,areaVector,source:'背景面'};}
+  return {area:Number(p.area),areaVector:null,source:'手入力面積'};
+}
+function specifiedInletFlow(p){
+  if(p.purpose==='volumetricFlowRateInlet')return Number(p.Q);
+  if(p.purpose==='massFlowRateInlet')return Number(p.mdot)/num('rho');
+  if(p.purpose==='velocityInlet'){const m=patchMeasurement(p),u=strictVector(p.U);return u?(m.areaVector?Math.abs(Geometry.dot(u,m.areaVector)):Math.hypot(...u)*m.area):NaN;}
+  return 0;
+}
+function boundaryCombinationErrors(patches,c=cfg()){
+  if(c.compressible||!patches.length)return [];
+  const zero=strictVector(val('initialU'))?.every(x=>x===0),inlets=patches.filter(p=>fixedInletPurposes.has(p.purpose)&&specifiedInletFlow(p)>1e-14);
+  if(!zero||!inlets.length||patches.some(p=>pressurePurposes.has(p.purpose)))return [];
+  const qIn=inlets.reduce((s,p)=>s+specifiedInletFlow(p),0),qOut=patches.filter(p=>['volumetricFlowRateOutlet','massFlowRateOutlet'].includes(p.purpose)).reduce((s,p)=>s+(p.purpose==='massFlowRateOutlet'?Number(p.mdot)/num('rho'):Number(p.Q)),0);
+  if(qOut>0&&Math.abs(qIn-qOut)<=1e-6*Math.max(qIn,qOut))return [];
+  return [`${inlets.map(p=>p.name).join(', ')}: 非ゼロの流入に対し、圧力条件を持つ実出口がなく初期内部速度が0です。出口の圧力条件、指定流量の収支、初期化を確認してください。pRefCell/pRefValueだけでは流出流束は作れません。`];
+}
+function caseInputErrors(c=cfg()){
+  const errors=[],word=/^[A-Za-z_][A-Za-z0-9_]*$/;
+  for(const [name,sources] of patchSources())if(sources.some(s=>s.kind==='stl'&&s.active)&&sources.some(s=>s.kind==='background'&&s.active))errors.push(`${name}: 背景パッチとSTL由来パッチが同名です。別の名前で区別してください。`);
+  if(!strictVector(val('initialU')))errors.push('初期内部速度は (x y z) の有限値 [m/s] で指定してください。');
+  for(const id of ['nOuter','nCorrectors'])if(!Number.isInteger(num(id))||num(id)<1)errors.push(`${id} は1以上の整数です。`);
+  if(!Number.isInteger(num('nNonOrth'))||num('nNonOrth')<0)errors.push('nNonOrth は0以上の整数です。');
+  if(checked('foResiduals')){const fields=residualFieldNames(c),available=residualFieldCandidates(c);if(!fields.length)errors.push('solverInfoの監視対象fieldを指定してください。');for(const f of fields)if(!available.includes(f))errors.push(`solverInfo: ${f} は現在のソルバー・モデルの解く場ではありません。候補: ${available.join(' ')}`);}
+  if(checked('foSurfaceFieldValue')){
+    const names=fluxPatchNames(),sources=patchSources(),registered=new Set(c.patches.map(p=>p.name));
+    if(val('foSFVMode')==='manual'&&!names.length)errors.push('流量監視するpatch名を指定してください。');
+    for(const name of names){if(!word.test(name))errors.push(`流量監視: 不正なパッチ名 ${name}`);else if(!registered.has(name))errors.push(`流量監視: ${name} は境界パッチ表にありません。`);else if(sources.has(name)&&!sources.get(name).some(s=>s.active))errors.push(`流量監視: ${name} のメッシュ出力が無効です。`);}
+    if(val('foSFVField')==='rhoPhi'&&!c.vof)errors.push('rhoPhiの流量監視はVOF用です。単相ソルバーではphiを選択してください。');
+    if(!['phi','rhoPhi'].includes(val('foSFVField')))errors.push('流量監視のfieldはphiまたはrhoPhiを選択してください。');
+    if(!['sum','areaAverage','min','max'].includes(val('foSFVOperation')))errors.push('流量監視のoperationが未対応です。');
+    if(!(Number(val('foSFVInterval'))>0))errors.push('流量監視の出力間隔は正の値です。');
+  }
+  for(const p of c.patches)if(p.purpose==='symmetryPlane'){
+    const faces=allFaces().filter(f=>f.patch===p.name);if(!planarPatch(faces))errors.push(`${p.name}: symmetryPlaneは単一平面・共通法線が必要です。面を分けるか、解析意図に合う場合はsymmetryを選択してください。`);
+  }
+  if(checked('includeBlockMesh'))for(const g of blockMeshGroupedPatches()){
+    if(g.type==='symmetryPlane'&&g.axes.length>1)errors.push(`${g.name}: 複数方向の背景面をsymmetryPlaneにまとめることはできません。`);
+    if(g.type==='empty'){const cells=val('blockCells').trim().split(/\s+/).map(Number);for(const axis of g.axes){const i='XYZ'.indexOf(axis[0]);if(cells[i]!==1)errors.push(`${g.name}: emptyの厚み方向 ${axis[0]} は1セルにしてください。`);const other=blockMeshFaceDefs().find(f=>f.axis===axis[0]+(axis[1]==='+'?'-':'+'));if(other?.type!=='empty')errors.push(`${g.name}: emptyには対向する前後面の設定が必要です。`);}}
+  }
+  if(checked('includeSnappy')){
+    for(const id of ['nCellsBetweenLevels','snapSolveIter'])if(!Number.isInteger(num(id))||num(id)<1)errors.push(`${id} は1以上の整数です。`);
+    if(!(Number(val('snapTolerance'))>0))errors.push('snap toleranceは正の値です。');
+    if(checked('snappyLayers')){
+      const layers=layeredPatches();if(!layers.length)errors.push('層追加が有効ですが、層数が1以上の壁パッチがありません。形状表のlayersを設定してください。');
+      for(const id of ['finalLayerThickness','layerExpansionRatio','layerMinThickness'])if(!Number.isFinite(Number(val(id)))||Number(val(id))<=0)errors.push(`${id} は正の有限値です。`);
+      for(const p of layers){if(!Number.isInteger(p.n)||p.n<1||p.n>12)continue;const t=layerTotals(p.n);if(![t.first,t.total].every(x=>Number.isFinite(x)&&x>0))errors.push(`${p.name}: 層厚を計算できません。`);else if(num('layerMinThickness')>t.total)errors.push(`${p.name}: minThickness=${val('layerMinThickness')} が総層厚 ${fmt(t.total)} を超え、層が消失します。相対値 / mの指定も確認してください。`);}
+    }
+  }
+  // With snappy, final patch survival is only known after meshing. Check the
+  // explicit STL inlet/zero-gradient-outlet combination separately from the box.
+  if(!checked('includeSnappy'))errors.push(...boundaryCombinationErrors(c.patches,c));
+  else {const names=new Set(allFaces().map(f=>f.patch)),stl=c.patches.filter(p=>names.has(p.name));if(!c.patches.some(p=>pressurePurposes.has(p.purpose))&&stl.some(p=>p.purpose==='outletZeroGradient'||p.purpose==='inletOutlet'))errors.push(...boundaryCombinationErrors(stl,c));}
+  return [...new Set(errors)];
+}
+function caseInputWarnings(c=cfg()){
+  const warnings=[],stlNames=new Set(allFaces().map(f=>f.patch)),stl=c.patches.filter(p=>stlNames.has(p.name));
+  if(checked('includeSnappy')&&stl.some(p=>['outletZeroGradient','inletOutlet'].includes(p.purpose))&&boundaryCombinationErrors(stl,c).length&&c.patches.some(p=>pressurePurposes.has(p.purpose)))warnings.push('要確認: STL入口・出口に圧力条件がなく、背景側の圧力条件に依存しています。snappy後に背景パッチが消える場合は実出口へ圧力条件を設定してください。Allrunで残存パッチを再検査します。対象: '+stl.map(p=>p.name).join(', '));
+  if(checked('includeSnappy')&&!checked('snappyLayers')&&val('turbulenceType')!=='laminar')warnings.push('要確認: 壁面層は追加しません。必要な壁面解像度とyPlusを確認してください。層なしだけでは不正とは判定しません。');
+  if(checked('snappyLayers')&&val('layerRelativeSizes')==='true'&&num('finalLayerThickness')<.01)warnings.push('要確認: 最外層の相対厚さが近傍セル寸法の1%未満です。mやmmとの取り違えと層の消失を確認してください。');
+  if(c.patches.some(p=>p.purpose==='empty')&&checked('includeSnappy'))warnings.push('要確認: STLのempty条件は厚み方向1セルと前後面の対応を別途満たす必要があります。checkMeshの2次元判定と実メッシュを確認してください。');
+  return warnings;
+}
+function flowMonitorText(names){
+  if(!checked('foSurfaceFieldValue'))return '// Flow monitoring disabled.\n';
+  const object=(id,patches,operation)=>`    ${id}\n    {\n        type surfaceFieldValue;\n        libs (fieldFunctionObjects);\n        writeControl ${val('foBasicWriteControl')};\n        writeInterval ${val('foSFVInterval')};\n        regionType patch;\n        ${patches.length===1?'name '+patches[0]:'names ('+patches.join(' ')+')'};\n        operation ${operation};\n        fields (${val('foSFVField')});\n        writeFields false;\n    }\n`;
+  return '// Generated flow monitors; Allrun resolves automatic selections against the actual mesh.\n'+names.map(n=>object('patchFlux_'+n,[n],val('foSFVOperation'))).join('\n')+(names.length>1&&val('foSFVOperation')==='sum'?object('flowBalance',names,'sum'):'');
+}
+function runtimeCheckFiles(c,fields){
+  const sources=patchSources(),names=fluxPatchNames();
+  const config={version:1,solver:c.solver.id,compressible:c.compressible,rho:num('rho'),pressure:c.pMode==='p_rgh'?'p_rgh':'p',fields:fields.map(k=>allFieldTemplates[k].object),patches:c.patches.map(p=>({...p,sources:sources.get(p.name)||[{kind:'existing',label:'既存/手動',active:true}],inletFlow:specifiedInletFlow(p)})),flow:{enabled:checked('foSurfaceFieldValue'),mode:val('foSFVMode'),names,field:val('foSFVField'),operation:val('foSFVOperation'),writeControl:val('foBasicWriteControl'),writeInterval:Number(val('foSFVInterval'))},forcePatches:checked('foForces')||checked('foForceCoeffs')?listWords(val('foForcePatches')):[],residualFields:checked('foResiduals')?residualFieldNames(c):[]};
+  return [{path:c.caseName+'/scripts/validate_case.py',text:runtimeCheckScript},{path:c.caseName+'/system/caseBuilderChecks.json',text:JSON.stringify(config,null,2)+'\n'},{path:c.caseName+'/system/flowMonitors',text:flowMonitorText(names)}];
+}
+function updateCaseChecksUI(){
+  const c=cfg(),sources=patchSources(),residuals=residualFieldNames(c),flux=fluxPatchNames();
+  $('foResidualFields').disabled=val('foResidualMode')==='auto';if(val('foResidualMode')==='auto')$('foResidualFields').value=residuals.join(' ');
+  $('residualFieldsHelp').textContent='候補: '+residualFieldCandidates(c).join(' ')+(c.compressible?'。hはthermophysicalPropertiesから生成されるエンタルピーです。':'。代数的に計算するnut等は残差対象に含めません。');
+  $('foSFVPatch').disabled=val('foSFVMode')==='auto';if(val('foSFVMode')==='auto')$('foSFVPatch').value=flux.join(' ');
+  const old=val('foPatchCandidate');$('foPatchCandidate').replaceChildren();for(const p of c.patches){const option=document.createElement('option');option.value=p.name;option.textContent=p.name+' — '+(sources.get(p.name)?.map(s=>s.label).join(' / ')||'既存/手動');$('foPatchCandidate').append(option);}if(c.patches.some(p=>p.name===old))$('foPatchCandidate').value=old;
+  for(const def of blockMeshFaceDefs())$('bm'+def.key+'Name').dataset.priorPatchName=$('bm'+def.key+'Name').value;
+  $('addFluxPatch').disabled=!c.patches.length;
+  $('fluxPatchHelp').textContent=val('foSFVMode')==='auto'?'Allrunで面数が1以上の実パッチへ絞り込み、個別流量と符号付き和を監視します。用途が未登録の入口・出口は自動判定しません。':'手動指定はメッシュ生成後にも存在と面数を検査し、見つからなければ停止します。';
+  for(const row of $('patchTable').querySelectorAll('tbody tr')){const name=row.querySelector('[data-k="name"]').value;row.querySelector('[data-patch-source]').textContent=sources.get(name)?.map(s=>s.label+(s.active?'':'（出力無効）')).join(' / ')||'既存/手動';}
+  const pressure=c.patches.filter(p=>pressurePurposes.has(p.purpose));$('boundarySetupStatus').className='note '+(caseInputWarnings(c).some(w=>w.includes('背景側'))?'warn':'');$('boundarySetupStatus').textContent=caseInputWarnings(c).filter(w=>w.includes('背景側')).join('\n')+'\n圧力条件: '+(pressure.map(p=>p.name+' ['+(sources.get(p.name)?.map(s=>s.label).join('/')||'手動')+']').join(', ')||'未設定（閉じた領域や流量収支が指定済みの系は別途確認）');
+  $('algorithmHelp').textContent=c.solver.time==='steady'?'SIMPLEの残差基準は定常反復の終了条件です。':c.solver.id==='icoFoam'?'PISOでは外部反復の残差制御を出力しません。':`PIMPLEのresidualControlは時間ステップ内の外部反復用です。${num('nOuter')===1?'外部反復上限1では残差による短縮はありません。':''}解析時間全体の終了はendTime等で指定します。`;
+  const unit=val('layerRelativeSizes')==='true'?'近傍セル寸法に対する比':'m';
+  $('layerSummary').textContent=(checked('snappyLayers')?'層追加 有効':'層追加 無効')+' / 厚さ単位: '+unit+'。'+layeredPatches().map(p=>{const t=layerTotals(p.n);return `${p.name}: ${p.n}層、第一層 ${fmt(t.first)}、総厚さ ${fmt(t.total)}`;}).join(' / ')+'。形状表のlayersが既存形状への層数です。壁面解像度はyPlus出力で確認してください。';
+  const lines=[],faces=allFaces();if(faces.length){const b=Geometry.bounds(faces);lines.push('メッシュ用STL全体 [m]: '+Geometry.sub(b.max,b.min).map(x=>fmt(x*num('stlScale'))).join(' × '));}
+  for(const p of c.patches.filter(p=>fixedInletPurposes.has(p.purpose))){const m=patchMeasurement(p);lines.push(`${p.name}: 面積 ${fmt(m.area)} m² (${m.source})、|U| ${fmt(magVector(flowVelocity(p)))} m/s、入力流量目安 ${fmt(specifiedInletFlow(p))} m³/s`);}
+  lines.push('STL法線の向き・実メッシュの面積で流量は変わります。単位や用途は自動変更しません。');$('physicalScaleSummary').textContent=lines.join('\n');
+}
+function caseCheckDefaults(data){
+  const inputs=data.inputs||{},legacyFields='p p_rgh U T k epsilon omega alpha.water';
+  return {initialU:'(0 0 0)',foResidualMode:!inputs.foResidualFields||inputs.foResidualFields===legacyFields?'auto':'manual',foSFVMode:inputs.foSFVPatch?'manual':'auto',layerRelativeSizes:'true',layerMinThickness:'0.05',layerExpansionRatio:'1.2',nCellsBetweenLevels:'3',snapTolerance:'2',snapSolveIter:'30',...inputs};
+}
+function initCaseChecksUI(){
+  for(const def of blockMeshFaceDefs())$('bm'+def.key+'Name').addEventListener('input',event=>{
+    const el=event.target,old=el.dataset.priorPatchName,name=el.value.trim();
+    if(old&&old!==name&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)&&!blockMeshFaceDefs().some(f=>f.name===old)&&!patchRow(name)){
+      const row=patchRow(old);if(row){row.querySelector('[data-k="name"]').value=name;row.dataset.patchName=name;}
+      if(managedPatchNames.delete(old))managedPatchNames.add(name);renamePatchReferences(old,name);
+    }
+  },true);
+  $('addFluxPatch').addEventListener('click',()=>{const name=val('foPatchCandidate');if(!name)return;$('foSFVPatch').value=[...new Set([...fluxPatchNames(),name])].join(' ');$('foSFVMode').value='manual';generate();});
+  updateCaseChecksUI();
+}
+
 function allFaces(){return [...geometryParts.values()].flatMap(p=>p.faces);}
 function selectedFaces(){return allFaces().filter(f=>f.selected);}
 function rememberGeometry(){geometryHistory.push({faces:allFaces().map(f=>({patch:f.patch,hidden:f.hidden,selected:!!f.selected})),patches:getPatches()});if(geometryHistory.length>20)geometryHistory.shift();}
@@ -1861,7 +2015,7 @@ function assignVisualPatch(){
   if(allFaces().some(f=>!fs.includes(f)&&f.patch===name&&!fs.some(s=>s.file===f.file))){visualPatchStatus(`${name} は別のSTLで使用中です。部品ごとに名前を分けてください。`,true);return;}
   if(new Set(fs.map(f=>f.file)).size>1){visualPatchStatus('パッチ割り当てはSTLごとに行ってください。',true);return;}
   const updating=!!patchRow(name);
-  rememberGeometry();fs.forEach(f=>f.patch=name);
+  const oldNames=new Set(fs.map(f=>f.patch));rememberGeometry();fs.forEach(f=>f.patch=name);for(const old of oldNames)if(!allFaces().some(f=>f.patch===old))renamePatchReferences(old,name);
   const m=Geometry.measure(fs),scale=Number(val('stlScale'));
   upsertPatch({...patchDefaults(name,val('visualPurpose')),U:val('visualU'),Q:val('visualQ'),mdot:val('visualMdot'),p:val('visualP'),T:val('visualT'),alpha:val('visualAlpha'),area:fmt(m.area*scale*scale),normal:'('+m.normal.join(' ')+')'});
   managedPatchNames.add(name);generate();refreshViewer();
@@ -1961,7 +2115,7 @@ function blockingErrors(){
     if(mode==='ami')for(const part of geometryParts.values()){let inside=false,outside=false;for(const f of part.faces)for(const v of f.v){if(insideRotor(v.map(x=>x*Number(val('stlScale')))))inside=true;else outside=true;}if(inside&&outside)errs.push(`${part.file}: 回転円筒が部品を横切っています。回転部品を円筒内へ完全に収めてください。`);}
   }
   if(c.vof&&val('waterRegionMode')==='box'){const a=strictVector(val('waterBoxMin')),b=strictVector(val('waterBoxMax'));if(!a||!b||a.some((x,i)=>x>=b[i]))errs.push('VOF水領域の最小座標 < 最大座標を満たしてください。');}
-  return [...new Set([...errs,...auxiliaryInputErrors(c)])];
+  return [...new Set([...errs,...auxiliaryInputErrors(c),...caseInputErrors(c)])];
 }
 function rotorSurface(){const axis=strictVector(val('rotationAxis'));return Geometry.cylinder(strictVector(val('rotationOrigin'))||[0,0,0],axis&&Math.hypot(...axis)>0?axis:[0,0,1],Math.max(num('rotorRadius'),1e-12),Math.max(num('rotorLength'),1e-12));}
 function rotationCoeffs(){return `origin ${val('rotationOrigin')};\n        axis (${normVec(val('rotationAxis')).join(' ')});\n        omega ${fmt(num('rotationRPM')*2*Math.PI/60)}; // rad/s, converted from rpm\n`;}
@@ -1983,16 +2137,46 @@ function motionFiles(c){
 }
 function buildAllrun(c){
   const mode=val('meshMotion'),commands=[];
-  if(checked('includeBlockMesh'))commands.push('runApplication blockMesh');else commands.push('test -f constant/polyMesh/points || { echo "Existing constant/polyMesh is required" >&2; exit 1; }');
-  if(checked('includeSnappy'))commands.push('runApplication surfaceFeatureExtract','runApplication snappyHexMesh -overwrite');
-  if(mode==='ami')commands.push('runApplication createPatch -overwrite');
-  if(mode==='mrf')commands.push('runApplication topoSet');
-  commands.push('runApplication checkMesh -allTopology -allGeometry');
-  if(c.vof)commands.push('runApplication setFields');
-  if(num('nProc')>1)commands.push('runApplication decomposePar',`runParallel -np ${val('nProc')} ${c.solver.id}`,'runApplication reconstructPar');else commands.push(`runApplication ${c.solver.id}`);
-  return `#!/bin/sh\nset -e\ncd "\${0%/*}" || exit 1\n. "\${WM_PROJECT_DIR:?Source OpenFOAM v2412 first}/bin/tools/RunFunctions"\n[ "\${WM_PROJECT_VERSION:-}" = v2412 ] || { echo "OpenFOAM v2412 is required" >&2; exit 1; }\n${commands.join('\n')}\ntouch ${c.caseName}.foam\n`;
+  if(checked('includeBlockMesh'))commands.push('runFresh blockMesh');else commands.push('test -f constant/polyMesh/points -o -f constant/polyMesh/points.gz || { echo "Existing constant/polyMesh is required" >&2; exit 1; }');
+  if(checked('includeSnappy'))commands.push('runFresh surfaceFeatureExtract','runFresh snappyHexMesh -overwrite');
+  if(mode==='ami')commands.push('runFresh createPatch -overwrite');
+  if(mode==='mrf')commands.push('runFresh topoSet');
+  commands.push('python3 scripts/validate_case.py');
+  if(c.vof)commands.push('runFresh setFields');
+  if(num('nProc')>1)commands.push('runFresh decomposePar -force',`runParallelFresh ${val('nProc')} ${c.solver.id}`,'runFresh reconstructPar');else commands.push(`runFresh ${c.solver.id}`);
+  return `#!/bin/sh
+set -eu
+export LC_ALL=C
+cd "$(dirname "$0")" || exit 1
+[ "\${WM_PROJECT_VERSION:-}" = v2412 ] || { echo "Source OpenCFD OpenFOAM v2412 first" >&2; exit 1; }
+command -v python3 >/dev/null || { echo "Python 3 is required for the mesh and boundary checks" >&2; exit 1; }
+runFresh()
+{
+    case_builder_log="log.$1"
+    echo "Running $*"
+    if "$@" >"$case_builder_log" 2>&1; then :; else
+        case_builder_status=$?
+        tail -n 40 "$case_builder_log" >&2
+        exit "$case_builder_status"
+    fi
 }
-function caseGuide(c){return auxiliaryGuide(c)+`# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Register the mesh boundary regions in the boundary-condition table before using the case.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
+runParallelFresh()
+{
+    case_builder_np="$1"
+    shift
+    case_builder_log="log.$1"
+    echo "Running $* on $case_builder_np processes"
+    if mpirun -np "$case_builder_np" "$@" -parallel >"$case_builder_log" 2>&1; then :; else
+        case_builder_status=$?
+        tail -n 40 "$case_builder_log" >&2
+        exit "$case_builder_status"
+    fi
+}
+${commands.join('\n')}
+touch ${c.caseName}.foam
+`;
+}
+function caseGuide(c){return auxiliaryGuide(c)+`# Run and inspect this case\n\nSource OpenCFD OpenFOAM v2412 and run sh Allrun. Python 3 is required. Allrun reruns preprocessing, then scripts/validate_case.py performs a fresh checkMesh, fingerprints the mesh and checks actual nonempty patches against initial fields and monitoring references. A failed or incomplete check stops before decomposition and solving. Inspect log.checkMesh and case-check-report.json. Bad mesh sets are requested in VTK format for diagnosis.\n\nFlow monitoring is included from system/flowMonitors. Automatic selections are resolved against the actual mesh; manual missing patches stop the run. patchFlux_<name> gives signed flux (outward positive); flowBalance sums the selected inlet/outlet patches. solverInfo1 records equation solver information. Keep the complete exported case together.\n\nPIMPLE residualControl applies within each time step, not to convergence of the entire time history. nOuterCorrectors=1 has no outer iterations to shorten. SIMPLE residualControl terminates steady iterations.\n\n# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Register the mesh boundary regions in the boundary-condition table before using the case.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
 function projectSnapshot(){const inputs={};document.querySelectorAll('input[id],select[id],textarea[id]').forEach(el=>{if(!['file'].includes(el.type)&&!['previewText','previewSelect','applicationMirror','fieldAddSelect'].includes(el.id))inputs[el.id]=el.type==='checkbox'?el.checked:el.value;});const data={format:'OpenFOAM-Case-Builder',version:3,auxiliary:auxiliaryProjectData(),inputs,patches:getPatches(),geometries:getGeometries(),parts:[...geometryParts.values()].map(p=>({file:p.file,originalName:p.originalName,faces:p.faces.map(f=>({v:f.v,region:f.region,patch:f.patch,hidden:f.hidden}))})),manualFields};return data;}
 function saveProject(){if(auxiliaryBusy){setStatus('CSV / 初期水領域STLの読み込み完了を待ってください。');return;}const data=projectSnapshot();saveBlob(new Blob([JSON.stringify(data)],{type:'application/json'}),sanitizeCaseName(val('caseName'))+'.project.json');}
 function restoreProject(data){
@@ -2000,7 +2184,7 @@ function restoreProject(data){
   if(data.parts.reduce((n,p)=>n+(p.faces?.length||0),0)>750000)throw Error('作業ファイルの三角形数が上限を超えています。');
   const auxiliaryStaged=stageAuxiliaryProject(data);
   const staged=new Map();for(const p of data.parts){if(!/^[A-Za-z_][A-Za-z0-9_]*\.stl$/.test(p.file)||staged.has(p.file))throw Error('作業ファイルのSTL名が不正です。');const faces=p.faces.map(f=>({...Geometry.triangle(f.v,f.region),patch:Geometry.word(f.patch),hidden:!!f.hidden,file:p.file}));staged.set(p.file,{file:p.file,originalName:p.originalName,faces,topology:Geometry.topology(faces)});}
-  for(const [id,value] of Object.entries({showBackgroundMesh:true,domainMarginPercent:'20',...auxiliaryProjectInputs(data)})){const el=$(id);if(!el||el.type==='file'||!el.matches('input,select,textarea')||['previewText','previewSelect','applicationMirror'].includes(id))continue;if(el.type==='checkbox')el.checked=!!value;else el.value=String(value);}
+  for(const [id,value] of Object.entries({showBackgroundMesh:true,domainMarginPercent:'20',...caseCheckDefaults(data),...auxiliaryProjectInputs(data)})){const el=$(id);if(!el||el.type==='file'||!el.matches('input,select,textarea')||['previewText','previewSelect','applicationMirror'].includes(id))continue;if(el.type==='checkbox')el.checked=!!value;else el.value=String(value);}
   if(!solverDb.some(s=>s.id===val('solver')))$('solver').value='pimpleFoam';applySolverDefaults(val('solver'));
   $('patchTable').querySelector('tbody').innerHTML='';data.patches.forEach(p=>addPatch({...patchDefaults('patch'),...p}));
   $('geometryTable').querySelector('tbody').innerHTML='';data.geometries.forEach(addGeometry);geometryParts.clear();selectedGeometryFiles.clear();for(const [name,p] of staged){geometryParts.set(name,p);selectedGeometryFiles.set(name,true);}
@@ -2014,7 +2198,7 @@ function demoGeometry(){
 }
 function initWorkbench(){
   const picker=$('geometryFilesPicker');$('stlPickerSlot').append(picker.parentElement);
-  $('visualPurpose').innerHTML=patchPurposes.filter(([k])=>!['cyclic','cyclicAMI','wedge','empty','symmetry','interface'].includes(k)).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
+  $('visualPurpose').innerHTML=patchPurposes.filter(([k])=>!['cyclic','cyclicAMI','wedge','interface'].includes(k)).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
   viewer=new STLViewer($('stlCanvas'),pickFace,{onPointViewChange:updateFluidPointStatus,onDomainViewChange:updateBackgroundMeshStatus,onViewChange:updateViewButtons});syncViewerOverlays();viewer.setFaces([],true);workbenchReady=true;
   const bind=(id,fn)=>$(id).addEventListener('click',fn);
   document.querySelectorAll('[data-view]').forEach(button=>bind(button.id,()=>{viewer.view(button.dataset.view);$('viewRotationStatus').dataset.error='false';$('viewRotationStatus').textContent='標準ビューに切り替えました。角度欄は次に適用する増分です。';}));
@@ -2254,6 +2438,7 @@ function initInputsUI(){
 init();
 initWorkbench();
 initInputsUI();
+initCaseChecksUI();
 })();
 </script>
 </body>
