@@ -45,7 +45,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
 <body>
 <header>
   <h1>OpenFOAM v2412 Case Builder v8.4</h1>
-  <p id="buildRevision">境界パッチ削除 修正版</p>
+  <p id="buildRevision">境界パッチ登録・削除 修正版</p>
   <p>STLを見ながら面と境界条件を設定し、OpenFOAM v2412のケースを生成します。回転メッシュ・VOF適合細分化・初期水STL・加速度CSV・作業保存に対応。HTMLを直接開いて使えます。</p>
 </header>
 
@@ -86,6 +86,8 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
       <label for="visualPurpose">境界の用途</label><select id="visualPurpose"></select>
       <div class="grid2"><div><label for="visualU">速度 U [m/s]</label><input id="visualU" value="(1 0 0)"></div><div><label for="visualQ">体積流量 [m³/s]</label><input id="visualQ" type="number" step="any" value="0.001"></div><div><label for="visualMdot">質量流量 [kg/s]</label><input id="visualMdot" type="number" step="any" value="1"></div><div><label for="visualP">圧力（単位はソルバーに依存）</label><input id="visualP" type="number" step="any" value="0"></div><div><label for="visualT">温度 [K]</label><input id="visualT" type="number" step="any" value="293.15"></div><div><label for="visualAlpha">第1相（水）体積率 [0–1]</label><input id="visualAlpha" type="number" min="0" max="1" step="0.1" value="1"></div></div>
       <button id="assignVisualPatch" class="green">選択面にパッチ・境界条件を割り当て</button>
+      <div id="visualPatchStatus" class="note" role="status" aria-live="polite" hidden></div>
+      <a id="assignedPatchLink" href="#boundaryPatchesPanel" hidden>第4欄の境界パッチを確認</a>
       <details><summary>領域と流れ方向</summary>
         <div class="btns"><button id="fitDomain" class="light">STLから背景領域を設定</button><button id="flowX">流れ +X</button><button id="flowY">流れ +Y</button><button id="flowZ">流れ +Z</button></div>
         <p class="hint">流れ方向は背景面と登録済みのinletに反映します。境界条件を追加する場合は、4番の「形状・背景から追加」を押してください。</p>
@@ -242,11 +244,11 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel" id="boundaryPatchesPanel">
       <h2>4. 境界パッチと0ディレクトリ</h2>
       <div class="note ok">強化点: patch用途を増やし、<b>体積流量 Q [m3/s]</b> と <b>質量流量 mdot [kg/s]</b> を境界条件として直接指定できるようにしました。</div>
       <div class="btns"><button id="addPatch" class="light">patch追加</button><button id="addMeshPatches" class="light">形状・背景から追加</button><button id="resetPatches" class="ghost">一覧を空にする</button><button id="guessFields" class="secondary">必要field再推定</button></div>
-      <p id="patchEmptyStatus" class="hint">境界パッチは未登録です。「patch追加」で1行ずつ登録するか、「形状・背景から追加」で現在のメッシュ設定から追加してください。</p>
+      <p id="patchEmptyStatus" class="hint">境界パッチは未登録です。STLの選択面にパッチ・境界条件を割り当てると、ここに追加されます。「patch追加」や「形状・背景から追加」でも登録できます。</p>
       <div class="tableWrap" style="margin-top:10px"><table id="patchTable"><thead><tr><th>patch名</th><th>用途</th><th>U/接線速度</th><th>normal</th><th>面積A</th><th>Q</th><th>mdot</th><th>p/p_rgh</th><th>T</th><th>alpha</th><th></th></tr></thead><tbody></tbody></table></div>
       <div class="hint">体積流量/質量流量入口では <span class="mono">flowRateInletVelocity</span>、出口では <span class="mono">flowRateOutletVelocity</span> を生成します。normalと面積Aは初期valueの推算に使います。</div>
       <details>
@@ -1689,13 +1691,29 @@ function updateSelection(){
   $('assignVisualPatch').disabled=!fs.length; $('hideSelection').disabled=!fs.length; $('isolateSelection').disabled=!fs.length;
   $('undoGeometry').disabled=!geometryHistory.length;
 }
+function clearVisualPatchStatus(){
+  $('visualPatchStatus').hidden=true;$('assignedPatchLink').hidden=true;
+}
+function loadVisualPatch(name){
+  $('visualPatchName').value=name;
+  const p=getPatches().find(x=>x.name===name);
+  if(p){
+    $('visualPurpose').value=p.purpose;
+    for(const [key,id] of Object.entries({U:'visualU',Q:'visualQ',mdot:'visualMdot',p:'visualP',T:'visualT',alpha:'visualAlpha'}))$(id).value=p[key];
+  }
+  clearVisualPatchStatus();
+}
+function visualPatchStatus(text,error=false){
+  const el=$('visualPatchStatus');el.textContent=text;el.className='note '+(error?'danger':'ok');el.hidden=false;
+  $('assignedPatchLink').hidden=error;
+  setStatus(text);
+}
 function pickFace(f,add){
   const part=geometryParts.get(f.file);if(!part)return;
   if(!add)allFaces().forEach(x=>x.selected=false);
   const indices=Geometry.select(part.faces,part.topology,part.faces.indexOf(f),val('selectionMode'),num('selectionAngle',20));
   indices.forEach(i=>part.faces[i].selected=true);
-  $('visualPatchName').value=f.patch;
-  const p=getPatches().find(x=>x.name===f.patch);if(p){$('visualPurpose').value=p.purpose;for(const k of ['U','Q','T','p','alpha','mdot'])$('visual'+({p:'P',alpha:'Alpha',mdot:'Mdot'}[k]||k)).value=p[k];}
+  loadVisualPatch(f.patch);
   viewer?.recolor();updateSelection();
 }
 async function importGeometryFiles(files){
@@ -1729,7 +1747,7 @@ function renderParts(){
     button('単独表示',()=>{rememberGeometry();allFaces().forEach(f=>{f.hidden=f.file!==name;f.selected=false;});refreshViewer();});
     root.append(row);
     const group=document.createElement('div');group.className='btns';
-    for(const patch of [...new Set(p.faces.map(f=>f.patch))]){const b=document.createElement('button');b.className='light small';b.textContent=patch;b.addEventListener('click',()=>{allFaces().forEach(f=>f.selected=f.patch===patch&&!f.hidden);$('visualPatchName').value=patch;const bc=getPatches().find(x=>x.name===patch);if(bc)$('visualPurpose').value=bc.purpose;viewer?.recolor();updateSelection();});group.append(b);}
+    for(const patch of [...new Set(p.faces.map(f=>f.patch))]){const b=document.createElement('button');b.className='light small';b.textContent=patch;b.addEventListener('click',()=>{allFaces().forEach(f=>f.selected=f.patch===patch&&!f.hidden);loadVisualPatch(patch);viewer?.recolor();updateSelection();});group.append(b);}
     root.append(group);
   }
 }
@@ -1737,16 +1755,18 @@ function patchDefaults(name,purpose='wallNoSlip') {return {name,purpose,U:'(0 0 
 function patchRow(name){return [...$('patchTable').querySelectorAll('tbody tr')].find(tr=>tr.querySelector('[data-k="name"]').value===name);}
 function upsertPatch(p){const row=patchRow(p.name);if(row){for(const [k,v] of Object.entries(p)){const el=row.querySelector(`[data-k="${k}"]`);if(el)el.value=v;}}else addPatch({...patchDefaults(p.name),...p});}
 function purposeType(purpose){return ['empty','symmetryPlane','symmetry','wedge','cyclic','cyclicAMI'].includes(purpose)?purpose:/wall/i.test(purpose)?'wall':'patch';}
-function meshPatchRequirements(){
+function meshPatchRequirements(includeInactive=false){
   const required=new Map();
-  if(checked('includeBlockMesh'))for(const g of blockMeshGroupedPatches())required.set(g.name,blockMeshPatchPurpose(g.name,g.type));
-  if(checked('includeSnappy'))for(const p of geometryParts.values())for(const f of p.faces)required.set(f.patch,'wallNoSlip');
+  if(includeInactive||checked('includeBlockMesh'))for(const g of blockMeshGroupedPatches())required.set(g.name,blockMeshPatchPurpose(g.name,g.type));
+  if(includeInactive||checked('includeSnappy'))for(const p of geometryParts.values())for(const f of p.faces)required.set(f.patch,'wallNoSlip');
   if(val('meshMotion')==='ami'){required.set('rotorAMI','cyclicAMI');required.set('statorAMI','cyclicAMI');}
   return required;
 }
 function syncVisualPatches(addMissing=false){
-  const required=meshPatchRequirements(),existing=new Set(getPatches().map(p=>p.name)),compressible=cfg().compressible;
-  for(const name of managedPatchNames)if(!required.has(name)){patchRow(name)?.remove();managedPatchNames.delete(name);}
+  const required=meshPatchRequirements(),sources=meshPatchRequirements(true),existing=new Set(getPatches().map(p=>p.name)),compressible=cfg().compressible;
+  // Disabling dictionary output must not delete explicitly registered conditions.
+  // Only remove a managed row when its source patch has actually disappeared.
+  for(const name of managedPatchNames)if(!sources.has(name)){patchRow(name)?.remove();managedPatchNames.delete(name);}
   if(addMissing)for(const [name,purpose] of required)if(!existing.has(name)){
     const p=patchDefaults(name,purpose);if(purpose==='velocityInlet')p.U=p.normal=blockMeshInletDirection(name);
     if(compressible&&purpose==='pressureOutlet')p.p='101325';
@@ -1755,15 +1775,18 @@ function syncVisualPatches(addMissing=false){
 }
 function assignVisualPatch(){
   const fs=selectedFaces(),name=val('visualPatchName').trim();
-  if(!fs.length)return;
-  if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)){setStatus('パッチ名は半角英字・数字・_で指定し、数字から始めないでください。');return;}
-  if(blockMeshGroupedPatches().some(p=>p.name===name)||['rotorAMI','statorAMI','rotorZone'].includes(name)){setStatus('背景領域・回転領域と重ならないパッチ名にしてください。');return;}
-  if(allFaces().some(f=>!fs.includes(f)&&f.patch===name&&!fs.some(s=>s.file===f.file))){setStatus('別STLと同じパッチ名は使えません。部品ごとに名前を分けてください。');return;}
-  if(new Set(fs.map(f=>f.file)).size>1){setStatus('パッチ割り当てはSTLごとに行ってください。');return;}
+  if(!fs.length){visualPatchStatus('STLの面を選択してから割り当ててください。',true);return;}
+  if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)){visualPatchStatus('パッチ名は半角英字・数字・_で指定し、数字から始めないでください。',true);return;}
+  if(blockMeshGroupedPatches().some(p=>p.name===name)){visualPatchStatus(`${name} は背景メッシュで使用中です。STL側は ${name}_stl などの別名にするか、9番で背景面の名前を変更してください。`,true);return;}
+  if(['rotorAMI','statorAMI','rotorZone'].includes(name)){visualPatchStatus(`${name} は回転領域用の名前です。別のパッチ名を指定してください。`,true);return;}
+  if(allFaces().some(f=>!fs.includes(f)&&f.patch===name&&!fs.some(s=>s.file===f.file))){visualPatchStatus(`${name} は別のSTLで使用中です。部品ごとに名前を分けてください。`,true);return;}
+  if(new Set(fs.map(f=>f.file)).size>1){visualPatchStatus('パッチ割り当てはSTLごとに行ってください。',true);return;}
+  const updating=!!patchRow(name);
   rememberGeometry();fs.forEach(f=>f.patch=name);
   const m=Geometry.measure(fs),scale=Number(val('stlScale'));
   upsertPatch({...patchDefaults(name,val('visualPurpose')),U:val('visualU'),Q:val('visualQ'),mdot:val('visualMdot'),p:val('visualP'),T:val('visualT'),alpha:val('visualAlpha'),area:fmt(m.area*scale*scale),normal:'('+m.normal.join(' ')+')'});
-  managedPatchNames.add(name);generate();refreshViewer();setStatus(`${name} を ${fs.length} 三角形に割り当てました。STL・snappyHexMeshDict・0/のパッチ名を同期します。`);
+  managedPatchNames.add(name);generate();refreshViewer();
+  visualPatchStatus(`${name} を ${fs.length} 三角形に割り当て、第4欄の境界パッチを${updating?'更新':'追加'}しました。入力した条件は0ディレクトリにも反映されます。`);
 }
 function setStatus(text){$('geometryStatus').textContent=text;}
 function setFlow(axis){
@@ -1887,7 +1910,7 @@ function restoreProject(data){
   if(!solverDb.some(s=>s.id===val('solver')))$('solver').value='pimpleFoam';applySolverDefaults(val('solver'));
   $('patchTable').querySelector('tbody').innerHTML='';data.patches.forEach(p=>addPatch({...patchDefaults('patch'),...p}));
   $('geometryTable').querySelector('tbody').innerHTML='';data.geometries.forEach(addGeometry);geometryParts.clear();selectedGeometryFiles.clear();for(const [name,p] of staged){geometryParts.set(name,p);selectedGeometryFiles.set(name,true);}
-  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set(getPatches().map(p=>p.name).filter(name=>meshPatchRequirements().has(name)));geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();setStatus('作業を復元しました。');
+  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set(getPatches().map(p=>p.name).filter(name=>meshPatchRequirements(true).has(name)));geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();clearVisualPatchStatus();setStatus('作業を復元しました。');
 }
 function demoGeometry(){
   if(geometryParts.size){setStatus('デモを追加する前に作業を保存し、形状一覧の初期化で既存形状を解除してください。');return;}
@@ -1902,6 +1925,7 @@ function initWorkbench(){
   const bind=(id,fn)=>$(id).addEventListener('click',fn);
   for(const axis of ['X','Y','Z','Iso'])bind('view'+axis,()=>viewer.view(axis.toLowerCase()));
   bind('fitGeometry',()=>refreshViewer(true));bind('assignVisualPatch',assignVisualPatch);bind('demoGeometry',demoGeometry);
+  document.querySelectorAll('input[id^="visual"],select[id^="visual"]').forEach(el=>el.addEventListener('input',clearVisualPatchStatus));
   bind('hideSelection',()=>{rememberGeometry();selectedFaces().forEach(f=>{f.hidden=true;f.selected=false;});refreshViewer();});
   bind('isolateSelection',()=>{rememberGeometry();allFaces().forEach(f=>f.hidden=!f.selected);refreshViewer();});
   bind('showAllFaces',()=>{rememberGeometry();allFaces().forEach(f=>f.hidden=false);refreshViewer();});
