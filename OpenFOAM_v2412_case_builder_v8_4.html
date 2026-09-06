@@ -45,6 +45,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
 <body>
 <header>
   <h1>OpenFOAM v2412 Case Builder v8.4</h1>
+  <p id="buildRevision">境界パッチ削除 修正版</p>
   <p>STLを見ながら面と境界条件を設定し、OpenFOAM v2412のケースを生成します。回転メッシュ・VOF適合細分化・初期水STL・加速度CSV・作業保存に対応。HTMLを直接開いて使えます。</p>
 </header>
 
@@ -87,6 +88,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
       <button id="assignVisualPatch" class="green">選択面にパッチ・境界条件を割り当て</button>
       <details><summary>領域と流れ方向</summary>
         <div class="btns"><button id="fitDomain" class="light">STLから背景領域を設定</button><button id="flowX">流れ +X</button><button id="flowY">流れ +Y</button><button id="flowZ">流れ +Z</button></div>
+        <p class="hint">流れ方向は背景面と登録済みのinletに反映します。境界条件を追加する場合は、4番の「形状・背景から追加」を押してください。</p>
         <p class="hint">背景領域はSTL外接箱に余白20%を付けて設定します。内部流れでは、保持点を容器内の流体側に指定してください。</p>
         <label for="fluidOffset">選択面中心からの距離 [m]（STL法線方向が正）</label><input id="fluidOffset" type="number" step="any" value="0.001"><button id="setFluidPoint" class="ghost">選択面からlocationInMeshを設定</button>
       </details>
@@ -1265,11 +1267,18 @@ function blockMeshPatchPurpose(name,type){
   if(n.includes('wall')) return 'wallNoSlip';
   return 'genericPatch';
 }
+function blockMeshInletDirection(name){
+  const faces=blockMeshFaceDefs().filter(f=>f.name===name);
+  if(faces.length!==1)return '(1 0 0)';
+  const axis=faces[0].axis;
+  return '('+['X','Y','Z'].map(a=>a===axis[0]?(axis[1]==='-'?1:-1):0).join(' ')+')';
+}
 function syncBlockMeshFacesToPatches(){
   const existing=new Set(getPatches().map(p=>p.name));
   for(const g of blockMeshGroupedPatches()){
     if(!existing.has(g.name)){
-      addPatch({name:g.name, purpose:blockMeshPatchPurpose(g.name,g.type), U:g.name.toLowerCase().includes('inlet')?'(1 0 0)':'(0 0 0)', normal:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:g.name.toLowerCase().includes('inlet')?'1':'0'});
+      const inlet=g.name.toLowerCase().includes('inlet'),direction=blockMeshInletDirection(g.name);
+      addPatch({name:g.name, purpose:blockMeshPatchPurpose(g.name,g.type), U:inlet?direction:'(0 0 0)', normal:inlet?direction:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:inlet?'1':'0'});
       managedPatchNames.add(g.name);existing.add(g.name);
     }
   }
@@ -1305,7 +1314,11 @@ function addPatch(p){
   <td><input data-k="alpha" class="num" value="${esc(p.alpha)}" title="VOF alpha.water。水なら1、空気なら0"></td>
   <td><button class="danger small" data-remove>削除</button></td>`;
   tbody.appendChild(tr); tr.querySelector('[data-k="purpose"]').value=p.purpose;
-  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}if(managedPatchNames.delete(old))managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();})); tr.querySelector('[data-remove]').addEventListener('click',()=>{tr.remove(); generate();});
+  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}if(managedPatchNames.delete(old))managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();}));
+  tr.querySelector('[data-remove]').addEventListener('click',()=>{
+    managedPatchNames.delete(tr.dataset.patchName);
+    tr.remove();generate();
+  });
 }
 function getPatches(){ return [...$('patchTable').querySelectorAll('tbody tr')].map(tr=>{const o={}; tr.querySelectorAll('[data-k]').forEach(el=>o[el.dataset.k]=el.value.trim()); return o;}).filter(p=>p.name); }
 function cfg(){ const solver=solverDb.find(s=>s.id===val('solver'))||solverDb[0]; const mode=solver.mode; const compressible=mode==='compressible'||val('solver').includes('rho')||val('solver').includes('buoyantPimpleFoam'); const heatOn=val('heat')==='on'||mode==='boussinesq'||mode==='compressible'||mode==='cht'; const vof=mode==='vof'||val('solver').includes('inter'); const pMode=val('pressureMode')==='auto'?(vof||mode==='boussinesq'||val('solver').includes('buoyant')?'p_rgh':'p'):val('pressureMode'); const Uin=getPatches().find(p=>p.purpose.includes('Inlet'))?.U||'(1 0 0)'; const turb=turbulenceValues(magVector(Uin)||1); return {solver,mode,compressible,heatOn,vof,pMode,patches:getPatches(),turb,caseName:sanitizeCaseName(val('caseName'))}; }
@@ -1735,7 +1748,7 @@ function syncVisualPatches(addMissing=false){
   const required=meshPatchRequirements(),existing=new Set(getPatches().map(p=>p.name)),compressible=cfg().compressible;
   for(const name of managedPatchNames)if(!required.has(name)){patchRow(name)?.remove();managedPatchNames.delete(name);}
   if(addMissing)for(const [name,purpose] of required)if(!existing.has(name)){
-    const p=patchDefaults(name,purpose);if(purpose==='velocityInlet')p.U='(1 0 0)';
+    const p=patchDefaults(name,purpose);if(purpose==='velocityInlet')p.U=p.normal=blockMeshInletDirection(name);
     if(compressible&&purpose==='pressureOutlet')p.p='101325';
     addPatch(p);managedPatchNames.add(name);
   }
@@ -1753,7 +1766,13 @@ function assignVisualPatch(){
   managedPatchNames.add(name);generate();refreshViewer();setStatus(`${name} を ${fs.length} 三角形に割り当てました。STL・snappyHexMeshDict・0/のパッチ名を同期します。`);
 }
 function setStatus(text){$('geometryStatus').textContent=text;}
-function setFlow(axis){setBlockMeshPreset(axis);const v=['x','y','z'].map(a=>a===axis?1:0);syncBlockMeshFacesToPatches();upsertPatch({name:'inlet',purpose:'velocityInlet',U:'('+v.join(' ')+')',normal:'('+v.join(' ')+')'});generate();}
+function setFlow(axis){
+  setBlockMeshPreset(axis);
+  const v='('+['x','y','z'].map(a=>a===axis?1:0).join(' ')+')';
+  // Direction changes edit registered conditions, but never recreate deleted rows.
+  if(patchRow('inlet'))upsertPatch({name:'inlet',purpose:'velocityInlet',U:v,normal:v});
+  generate();
+}
 function fitDomain(){
   const fs=allFaces();if(!fs.length)return;const b=Geometry.bounds(fs),scale=Number(val('stlScale'));const extent=Geometry.sub(b.max,b.min),floor=Math.max(...extent)*.2;
   const min=b.min.map((x,i)=>(x-Math.max(extent[i]*.2,floor*.1))*scale),max=b.max.map((x,i)=>(x+Math.max(extent[i]*.2,floor*.1))*scale);

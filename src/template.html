@@ -45,6 +45,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
 <body>
 <header>
   <h1>OpenFOAM v2412 Case Builder v8.4</h1>
+  <p id="buildRevision">境界パッチ削除 修正版</p>
   <p>STLを見ながら面と境界条件を設定し、OpenFOAM v2412のケースを生成します。回転メッシュ・VOF適合細分化・初期水STL・加速度CSV・作業保存に対応。HTMLを直接開いて使えます。</p>
 </header>
 
@@ -558,11 +559,18 @@ function blockMeshPatchPurpose(name,type){
   if(n.includes('wall')) return 'wallNoSlip';
   return 'genericPatch';
 }
+function blockMeshInletDirection(name){
+  const faces=blockMeshFaceDefs().filter(f=>f.name===name);
+  if(faces.length!==1)return '(1 0 0)';
+  const axis=faces[0].axis;
+  return '('+['X','Y','Z'].map(a=>a===axis[0]?(axis[1]==='-'?1:-1):0).join(' ')+')';
+}
 function syncBlockMeshFacesToPatches(){
   const existing=new Set(getPatches().map(p=>p.name));
   for(const g of blockMeshGroupedPatches()){
     if(!existing.has(g.name)){
-      addPatch({name:g.name, purpose:blockMeshPatchPurpose(g.name,g.type), U:g.name.toLowerCase().includes('inlet')?'(1 0 0)':'(0 0 0)', normal:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:g.name.toLowerCase().includes('inlet')?'1':'0'});
+      const inlet=g.name.toLowerCase().includes('inlet'),direction=blockMeshInletDirection(g.name);
+      addPatch({name:g.name, purpose:blockMeshPatchPurpose(g.name,g.type), U:inlet?direction:'(0 0 0)', normal:inlet?direction:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:inlet?'1':'0'});
       managedPatchNames.add(g.name);existing.add(g.name);
     }
   }
@@ -598,7 +606,11 @@ function addPatch(p){
   <td><input data-k="alpha" class="num" value="${esc(p.alpha)}" title="VOF alpha.water。水なら1、空気なら0"></td>
   <td><button class="danger small" data-remove>削除</button></td>`;
   tbody.appendChild(tr); tr.querySelector('[data-k="purpose"]').value=p.purpose;
-  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}if(managedPatchNames.delete(old))managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();})); tr.querySelector('[data-remove]').addEventListener('click',()=>{tr.remove(); generate();});
+  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}if(managedPatchNames.delete(old))managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();}));
+  tr.querySelector('[data-remove]').addEventListener('click',()=>{
+    managedPatchNames.delete(tr.dataset.patchName);
+    tr.remove();generate();
+  });
 }
 function getPatches(){ return [...$('patchTable').querySelectorAll('tbody tr')].map(tr=>{const o={}; tr.querySelectorAll('[data-k]').forEach(el=>o[el.dataset.k]=el.value.trim()); return o;}).filter(p=>p.name); }
 function cfg(){ const solver=solverDb.find(s=>s.id===val('solver'))||solverDb[0]; const mode=solver.mode; const compressible=mode==='compressible'||val('solver').includes('rho')||val('solver').includes('buoyantPimpleFoam'); const heatOn=val('heat')==='on'||mode==='boussinesq'||mode==='compressible'||mode==='cht'; const vof=mode==='vof'||val('solver').includes('inter'); const pMode=val('pressureMode')==='auto'?(vof||mode==='boussinesq'||val('solver').includes('buoyant')?'p_rgh':'p'):val('pressureMode'); const Uin=getPatches().find(p=>p.purpose.includes('Inlet'))?.U||'(1 0 0)'; const turb=turbulenceValues(magVector(Uin)||1); return {solver,mode,compressible,heatOn,vof,pMode,patches:getPatches(),turb,caseName:sanitizeCaseName(val('caseName'))}; }

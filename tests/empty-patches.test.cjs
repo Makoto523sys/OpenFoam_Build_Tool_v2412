@@ -53,3 +53,38 @@ test('empty and populated projects preserve their exact patch lists on restore',
     assert.deepEqual(plain(a.api.getPatches().map(p=>p.name)),['waterJet']);assert.match(a.file('0/U'),/waterJet\s*\{/);
   }finally{a.close();}
 });
+
+for(const name of ['inlet','walls','outlet'])test(`${name} stays deleted after generation, flow changes and project restore`,()=>{
+  const a=app();try{
+    a.click('addMeshPatches');
+    const row=[...a.d.querySelectorAll('#patchTable tbody tr')].find(tr=>tr.querySelector('[data-k="name"]').value===name);
+    row.querySelector('[data-remove]').click();
+    const expected=plain(a.api.getPatches().map(p=>p.name));
+    assert.equal(expected.length,2);assert.ok(!expected.includes(name));
+    const check=()=>{
+      assert.deepEqual(plain(a.api.getPatches().map(p=>p.name)),expected);
+      for(const output of a.api.outputs().filter(o=>o.path.includes('/0/'))){
+        assert.doesNotMatch(output.text,new RegExp('\\n\\s*'+name+'\\s*\\{'),output.path);
+        for(const remaining of expected)assert.match(output.text,new RegExp('\\n\\s*'+remaining+'\\s*\\{'),output.path);
+      }
+    };
+    check();
+    for(const id of ['generateBtn','flowX','flowY','flowZ','presetVOF','guessFields']){a.click(id);check();}
+    a.api.restoreProject(plain(a.api.projectSnapshot()));check();
+    a.click('addMeshPatches');assert.ok(a.api.getPatches().some(p=>p.name===name));
+    assert.equal(a.api.getPatches().length,3);assert.equal(a.errors.length,0);
+  }finally{a.close();}
+});
+
+test('flow direction leaves an empty or cleared table empty; explicit additions use the chosen direction',()=>{
+  const a=app();try{
+    for(const button of ['addMeshPatches','bmSyncPatches'])for(const [axis,vector] of [['X','(1 0 0)'],['Y','(0 1 0)'],['Z','(0 0 1)']]){
+      a.click('resetPatches');a.click('flow'+axis);empty(a);
+      a.click(button);assert.equal(a.api.getPatches().find(p=>p.name==='inlet').U,vector);
+      assert.equal(a.api.getPatches().find(p=>p.name==='inlet').normal,vector);
+      for(const row of [...a.d.querySelectorAll('#patchTable tbody tr')])row.querySelector('[data-remove]').click();
+      empty(a);a.click('flow'+axis);a.click('generateBtn');empty(a);
+    }
+    assert.equal(a.errors.length,0);
+  }finally{a.close();}
+});

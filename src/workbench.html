@@ -31,6 +31,7 @@
       <button id="assignVisualPatch" class="green">選択面にパッチ・境界条件を割り当て</button>
       <details><summary>領域と流れ方向</summary>
         <div class="btns"><button id="fitDomain" class="light">STLから背景領域を設定</button><button id="flowX">流れ +X</button><button id="flowY">流れ +Y</button><button id="flowZ">流れ +Z</button></div>
+        <p class="hint">流れ方向は背景面と登録済みのinletに反映します。境界条件を追加する場合は、4番の「形状・背景から追加」を押してください。</p>
         <p class="hint">背景領域はSTL外接箱に余白20%を付けて設定します。内部流れでは、保持点を容器内の流体側に指定してください。</p>
         <label for="fluidOffset">選択面中心からの距離 [m]（STL法線方向が正）</label><input id="fluidOffset" type="number" step="any" value="0.001"><button id="setFluidPoint" class="ghost">選択面からlocationInMeshを設定</button>
       </details>

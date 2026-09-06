@@ -98,7 +98,7 @@ function syncVisualPatches(addMissing=false){
   const required=meshPatchRequirements(),existing=new Set(getPatches().map(p=>p.name)),compressible=cfg().compressible;
   for(const name of managedPatchNames)if(!required.has(name)){patchRow(name)?.remove();managedPatchNames.delete(name);}
   if(addMissing)for(const [name,purpose] of required)if(!existing.has(name)){
-    const p=patchDefaults(name,purpose);if(purpose==='velocityInlet')p.U='(1 0 0)';
+    const p=patchDefaults(name,purpose);if(purpose==='velocityInlet')p.U=p.normal=blockMeshInletDirection(name);
     if(compressible&&purpose==='pressureOutlet')p.p='101325';
     addPatch(p);managedPatchNames.add(name);
   }
@@ -116,7 +116,13 @@ function assignVisualPatch(){
   managedPatchNames.add(name);generate();refreshViewer();setStatus(`${name} を ${fs.length} 三角形に割り当てました。STL・snappyHexMeshDict・0/のパッチ名を同期します。`);
 }
 function setStatus(text){$('geometryStatus').textContent=text;}
-function setFlow(axis){setBlockMeshPreset(axis);const v=['x','y','z'].map(a=>a===axis?1:0);syncBlockMeshFacesToPatches();upsertPatch({name:'inlet',purpose:'velocityInlet',U:'('+v.join(' ')+')',normal:'('+v.join(' ')+')'});generate();}
+function setFlow(axis){
+  setBlockMeshPreset(axis);
+  const v='('+['x','y','z'].map(a=>a===axis?1:0).join(' ')+')';
+  // Direction changes edit registered conditions, but never recreate deleted rows.
+  if(patchRow('inlet'))upsertPatch({name:'inlet',purpose:'velocityInlet',U:v,normal:v});
+  generate();
+}
 function fitDomain(){
   const fs=allFaces();if(!fs.length)return;const b=Geometry.bounds(fs),scale=Number(val('stlScale'));const extent=Geometry.sub(b.max,b.min),floor=Math.max(...extent)*.2;
   const min=b.min.map((x,i)=>(x-Math.max(extent[i]*.2,floor*.1))*scale),max=b.max.map((x,i)=>(x+Math.max(extent[i]*.2,floor*.1))*scale);
