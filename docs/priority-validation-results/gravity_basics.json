@@ -1,0 +1,54 @@
+{
+  "gravity_m_s2": [
+    0,
+    0,
+    -9.81
+  ],
+  "constantContainerAcceleration_m_s2": [
+    0.981,
+    0,
+    0
+  ],
+  "static": {
+    "endTime_s": 50.0,
+    "last5sMeanHeight_m": [
+      1.2000024324318823,
+      1.1999971091945096,
+      1.1999960542830785,
+      1.199996556560353
+    ],
+    "last5sMaxHeightError_m": 4.180009999910084e-06,
+    "last5sPeakToPeak_m": [
+      5.027760001663495e-07,
+      3.625730000678118e-07,
+      4.7120599999672663e-07,
+      1.21676000164328e-07
+    ],
+    "finalMaxSpeed_m_s": 0.004339148447513972
+  },
+  "tilt": {
+    "theorySlope": -0.1,
+    "interiorPointsX_m": [
+      0.15,
+      0.35,
+      0.85,
+      1.05
+    ],
+    "theoryHeight_m": [
+      1.2449999999999999,
+      1.2249999999999999,
+      1.175,
+      1.155
+    ],
+    "meanHeight45to50_s_m": [
+      1.2450268119638335,
+      1.2251070308020002,
+      1.1748571442923332,
+      1.1549590463136667
+    ],
+    "fittedSlope": -0.1001754078679092,
+    "maxHeightError_m": 0.0001522570559999714,
+    "cornerMaxError_m": 0.004578406546000169,
+    "note": "Corner values are affected by the coarse 0.1 m mesh and boundary extrapolation."
+  }
+}

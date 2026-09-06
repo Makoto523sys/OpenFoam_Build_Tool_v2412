@@ -193,6 +193,82 @@ def quality_errors(log, returncode):
     return errors
 
 
+def mesh_list(path, kind):
+    seq = tokens(read_text(path)); pos = 0
+    if seq[0] == 'FoamFile':
+        header, pos = dictionary(seq, 1)
+        if header.get('format') != 'ascii':
+            raise ValueError('AMR convexity audit requires an ASCII mesh')
+    count = int(seq[pos]); pos += 1
+    if seq[pos] != '(':
+        raise ValueError('Invalid mesh list: ' + str(path))
+    pos += 1; values = []
+    for _ in range(count):
+        if kind == 'label':
+            values.append(int(seq[pos])); pos += 1
+        else:
+            n = 3 if kind == 'point' else int(seq[pos])
+            if kind == 'face': pos += 1
+            if seq[pos] != '(' or seq[pos+n+1] != ')':
+                raise ValueError('Invalid mesh vector/face')
+            values.append(tuple((float if kind == 'point' else int)(x) for x in seq[pos+1:pos+n+1])); pos += n+2
+    if seq[pos:] not in ([')'], [')',';']):
+        raise ValueError('Incomplete mesh list')
+    return values
+
+
+def convex_mesh_audit(files):
+    """Allow coplanar split faces only after testing every cell half-space."""
+    import math
+    points = mesh_list(files['points'], 'point'); faces = mesh_list(files['faces'], 'face')
+    owner = mesh_list(files['owner'], 'label'); neighbour = mesh_list(files['neighbour'], 'label')
+    if not points or len(owner) != len(faces) or not all(math.isfinite(x) for p in points for x in p):
+        raise ValueError('Invalid mesh for convexity audit')
+    size = max(max(p[k] for p in points)-min(p[k] for p in points) for k in range(3))
+    tol = max(size*1e-9, 1e-13)
+    cells = [[] for _ in range(max(owner+neighbour)+1)]; geometry = []
+    for i, ids in enumerate(faces):
+        q = [points[j] for j in ids]; c = tuple(sum(v[k] for v in q)/len(q) for k in range(3)); normal = [0.,0.,0.]
+        for u,v in zip(q,q[1:]+q[:1]):
+            a = [u[k]-c[k] for k in range(3)]; b = [v[k]-c[k] for k in range(3)]
+            for k in range(3): normal[k] += a[(k+1)%3]*b[(k+2)%3]-a[(k+2)%3]*b[(k+1)%3]
+        mag = math.sqrt(sum(x*x for x in normal))
+        if mag <= 0: raise ValueError('Degenerate face in convexity audit')
+        normal = tuple(x/mag for x in normal)
+        if max(abs(sum((v[k]-c[k])*normal[k] for k in range(3))) for v in q) > tol:
+            raise ValueError('Nonplanar face in AMR convexity audit')
+        geometry.append((c,normal)); cells[owner[i]].append((i,1))
+        if i < len(neighbour): cells[neighbour[i]].append((i,-1))
+    maximum = 0.
+    for cell in cells:
+        vertices = set(j for i,_ in cell for j in faces[i])
+        for i,sign in cell:
+            c,n = geometry[i]
+            for j in vertices:
+                distance = sign*sum((points[j][k]-c[k])*n[k] for k in range(3)); maximum = max(maximum,distance)
+                if distance > tol: raise ValueError('Nonconvex cell in AMR checkpoint; refusing restart')
+    return {'cells':len(cells),'maxOutwardDistance_m':maximum,'tolerance_m':tol,'passed':True}
+
+
+def checked_quality(case, config, files, start, log, returncode, report, notes):
+    errors = quality_errors(log, returncode)
+    if not errors or config.get('runMode') != 'restart' or config.get('meshMotion') != 'refine':
+        return errors
+    # Never hide other failed checks or a crashed/incomplete checkMesh run.
+    if returncode != 0 or not re.search(r'Failed\s+1\s+mesh checks',log) or not re.search(r'^\s*End\s*$',log,re.M):
+        return errors
+    flagged = [line for line in log.splitlines() if '***' in line]
+    if len(flagged) != 1 or 'Concave cells (using face planes)' not in flagged[0]:
+        return errors
+    report['amrConvexityAudit'] = convex_mesh_audit(files)
+    with (case/'log.checkMesh.restart.standard').open('w') as stream:
+        p = subprocess.run(['checkMesh','-time',start,'-noFunctionObjects'],cwd=case,stdout=stream,stderr=subprocess.STDOUT,stdin=subprocess.DEVNULL)
+    normal = (case/'log.checkMesh.restart.standard').read_text(errors='replace')
+    errors = quality_errors(normal,p.returncode)
+    if not errors: notes.append('AMR checkpoint: coplanar split faces accepted after all-cell convexity audit and standard checkMesh; detailed report retained')
+    return errors
+
+
 def type_of(entry):
     return entry.get("type", "") if isinstance(entry, dict) else ""
 
@@ -299,6 +375,10 @@ def validate(case):
         config = json.loads((case / "system/caseBuilderChecks.json").read_text())
         start = initial_time(case)
         files = mesh_files(case, start)
+        if config.get("runMode") == "restart" and config.get("meshMotion") == "refine":
+            for name in ("cellLevel", "pointLevel", "refinementHistory"):
+                if not existing_file(files["faces"].parent / name):
+                    errors.append("AMR restart requires saved mesh history: " + name)
         report["time"] = start
         report["meshBefore"] = fingerprint(case, files)
         command = ["checkMesh", "-time", start, "-allTopology", "-allGeometry", "-writeSets", "vtk", "-noFunctionObjects"]
@@ -308,7 +388,7 @@ def validate(case):
             proc = subprocess.run(command, cwd=case, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
         log = (case / "log.checkMesh").read_text(errors="replace")
         report["openfoamHeader"] = [line.strip() for line in log.splitlines() if re.match(r"\s*(Build|Version|Arch|Exec)\s*:", line)]
-        errors.extend(quality_errors(log, proc.returncode))
+        errors.extend(checked_quality(case, config, files, start, log, proc.returncode, report, notes))
         report["meshAfter"] = fingerprint(case, mesh_files(case, start))
         if report["meshBefore"] != report["meshAfter"]:
             errors.append("The mesh changed during checkMesh; this result cannot authorize a solver run")
@@ -347,7 +427,7 @@ def validate(case):
                 errors.append("Force monitor has no nonempty matching patch: " + pattern)
         if any(p["type"] == "empty" for p in active.values()) and not re.search(r"Mesh has\s+2\s+geometric", log):
             errors.append("empty patches require a verified two-dimensional mesh; checkMesh did not confirm 2 geometric directions")
-        algorithm = "SIMPLE" if config["solver"] == "simpleFoam" else "PISO" if config["solver"] == "icoFoam" else "PIMPLE"
+        algorithm = "SIMPLE" if config["solver"] == "simpleFoam" else "PISO" if config["solver"] in ("icoFoam", "pisoFoam") else "PIMPLE"
         solution = parse_dictionary(foam_value(case, "system/fvSolution", algorithm))
         if algorithm == "PIMPLE":
             for field, entry in solution.get("residualControl", {}).items():

@@ -210,6 +210,9 @@ function followsMesh(p){
 function blockingErrors(){
   const errs=[],c=cfg(),mode=val('meshMotion'),word=/^[A-Za-z_][A-Za-z0-9_]*$/;
   if(c.solver.id==='chtMultiRegionFoam')errs.push('CHTは領域ごとの物性と熱連成境界が未対応です。');
+  if(!['fresh','restart'].includes(val('caseRunMode')))errs.push('実行方法は初回または再開を選択してください。');
+  if(val('caseRunMode')==='restart'&&(val('startFrom')!=='startTime'||!Number.isFinite(num('startTime'))||num('startTime')<=0))errs.push('再開はstartFrom=startTimeと正の保存済み時刻を指定してください。');
+  if(c.solver.id==='pisoFoam'&&val('adjustTimeStep')!=='no')errs.push('pisoFoam v2412は固定時間刻みです。adjustTimeStep=noとしてdeltaTを設定してください。');
   if(c.solver.id==='icoFoam'&&val('turbulenceType')!=='laminar')errs.push('icoFoamはlaminarを選択してください。');
   if(c.solver.time==='steady'&&val('turbulenceType')==='LES')errs.push('LES/DESには非定常ソルバーを選択してください。');
   if(c.solver.time==='transient'&&val('ddtScheme')==='steadyState')errs.push('非定常ソルバーでsteadyState時間離散は使用できません。');
@@ -267,14 +270,16 @@ function motionFiles(c){
   return files;
 }
 function buildAllrun(c){
-  const mode=val('meshMotion'),commands=[];
+  const mode=val('meshMotion'),restart=val('caseRunMode')==='restart',commands=[];
+  if(!restart){
   if(checked('includeBlockMesh'))commands.push('runFresh blockMesh');else commands.push('test -f constant/polyMesh/points -o -f constant/polyMesh/points.gz || { echo "Existing constant/polyMesh is required" >&2; exit 1; }');
   if(checked('includeSnappy'))commands.push('runFresh surfaceFeatureExtract','runFresh snappyHexMesh -overwrite');
   if(mode==='ami')commands.push('runFresh createPatch -overwrite');
   if(mode==='mrf')commands.push('runFresh topoSet');
+  }
   commands.push('python3 scripts/validate_case.py');
-  if(c.vof)commands.push('runFresh setFields');
-  if(num('nProc')>1)commands.push('runFresh decomposePar -force',`runParallelFresh ${val('nProc')} ${c.solver.id}`,'runFresh reconstructPar');else commands.push(`runFresh ${c.solver.id}`);
+  if(c.vof&&!restart)commands.push('runFresh setFields');
+  if(num('nProc')>1){commands.push('runFresh decomposePar -force'+(restart?' -time '+num('startTime'):''),`runParallelFresh ${val('nProc')} ${c.solver.id}`);if(mode==='refine')commands.push('runFresh reconstructParMesh');commands.push('runFresh reconstructPar');}else commands.push(`runFresh ${c.solver.id}`);
   return `#!/bin/sh
 set -eu
 export LC_ALL=C
@@ -283,7 +288,7 @@ cd "$(dirname "$0")" || exit 1
 command -v python3 >/dev/null || { echo "Python 3 is required for the mesh and boundary checks" >&2; exit 1; }
 runFresh()
 {
-    case_builder_log="log.$1"
+    case_builder_log="log.$1${restart?'.restart':''}"
     echo "Running $*"
     if "$@" >"$case_builder_log" 2>&1; then :; else
         case_builder_status=$?
@@ -295,7 +300,7 @@ runParallelFresh()
 {
     case_builder_np="$1"
     shift
-    case_builder_log="log.$1"
+    case_builder_log="log.$1${restart?'.restart':''}"
     echo "Running $* on $case_builder_np processes"
     if mpirun -np "$case_builder_np" "$@" -parallel >"$case_builder_log" 2>&1; then :; else
         case_builder_status=$?
@@ -307,7 +312,7 @@ ${commands.join('\n')}
 touch ${c.caseName}.foam
 `;
 }
-function caseGuide(c){return auxiliaryGuide(c)+`# Run and inspect this case\n\nSource OpenCFD OpenFOAM v2412 and run sh Allrun. Python 3 is required. Allrun reruns preprocessing, then scripts/validate_case.py performs a fresh checkMesh, fingerprints the mesh and checks actual nonempty patches against initial fields and monitoring references. A failed or incomplete check stops before decomposition and solving. Inspect log.checkMesh and case-check-report.json. Bad mesh sets are requested in VTK format for diagnosis.\n\nFlow monitoring is included from system/flowMonitors. Automatic selections are resolved against the actual mesh; manual missing patches stop the run. patchFlux_<name> gives signed flux (outward positive); flowBalance sums the selected inlet/outlet patches. solverInfo1 records equation solver information. Keep the complete exported case together.\n\nPIMPLE residualControl applies within each time step, not to convergence of the entire time history. nOuterCorrectors=1 has no outer iterations to shorten. SIMPLE residualControl terminates steady iterations.\n\n# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Register the mesh boundary regions in the boundary-condition table before using the case.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
+function caseGuide(c){return auxiliaryGuide(c)+`# Run and inspect this case\n\nSource OpenCFD OpenFOAM v2412 and run sh Allrun. Python 3 is required. Fresh mode runs preprocessing; explicit restart mode preserves the selected saved time, skips meshing/setFields and logs to log.<solver>.restart. For parallel restart, provide a reconstructed serial checkpoint; decomposePar repartitions that time. Keep materials, boundary conditions and acceleration history consistent with the checkpoint. scripts/validate_case.py performs a fresh checkMesh, fingerprints the mesh and checks actual nonempty patches against initial fields and monitoring references. A failed or incomplete check stops before decomposition and solving. Inspect log.checkMesh and case-check-report.json. Bad mesh sets are requested in VTK format for diagnosis.\n\nFlow monitoring is included from system/flowMonitors. Automatic selections are resolved against the actual mesh; manual missing patches stop the run. patchFlux_<name> gives signed flux (outward positive); flowBalance sums the selected inlet/outlet patches. solverInfo1 records equation solver information. Keep the complete exported case together.\n\nPIMPLE residualControl applies within each time step, not to convergence of the entire time history. nOuterCorrectors=1 has no outer iterations to shorten. SIMPLE residualControl terminates steady iterations.\n\n# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Register the mesh boundary regions in the boundary-condition table before using the case.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
 function projectSnapshot(){const inputs={};document.querySelectorAll('input[id],select[id],textarea[id]').forEach(el=>{if(!['file'].includes(el.type)&&!['previewText','previewSelect','applicationMirror','fieldAddSelect'].includes(el.id))inputs[el.id]=el.type==='checkbox'?el.checked:el.value;});const data={format:'OpenFOAM-Case-Builder',version:3,auxiliary:auxiliaryProjectData(),inputs,patches:getPatches(),geometries:getGeometries(),parts:[...geometryParts.values()].map(p=>({file:p.file,originalName:p.originalName,faces:p.faces.map(f=>({v:f.v,region:f.region,patch:f.patch,hidden:f.hidden}))})),manualFields};return data;}
 function saveProject(){if(auxiliaryBusy){setStatus('CSV / 初期水領域STLの読み込み完了を待ってください。');return;}const data=projectSnapshot();saveBlob(new Blob([JSON.stringify(data)],{type:'application/json'}),sanitizeCaseName(val('caseName'))+'.project.json');}
 function restoreProject(data){

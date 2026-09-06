@@ -1,0 +1,30 @@
+[
+  {
+    "time": 0.01,
+    "velocityRelativeL2": 0.007020910943515967,
+    "velocityMaxAbsoluteError": 1.2378305508529237e-05,
+    "transverseVelocityMax": 1.76856432522e-06,
+    "pressureMaxAbsoluteError": 1.4967669873550138e-05
+  },
+  {
+    "time": 0.1,
+    "velocityRelativeL2": 0.0024800224577974286,
+    "velocityMaxAbsoluteError": 2.1611802751588666e-05,
+    "transverseVelocityMax": 5.49260352065e-10,
+    "pressureMaxAbsoluteError": 2.985235289542677e-08
+  },
+  {
+    "time": 0.5,
+    "velocityRelativeL2": 0.0006860379165887697,
+    "velocityMaxAbsoluteError": 7.711055045425338e-06,
+    "transverseVelocityMax": 1.07614761377e-11,
+    "pressureMaxAbsoluteError": 1.7523128954810563e-09
+  },
+  {
+    "time": 1,
+    "velocityRelativeL2": 0.0008532699919881752,
+    "velocityMaxAbsoluteError": 7.811053673976434e-06,
+    "transverseVelocityMax": 7.72453570119e-14,
+    "pressureMaxAbsoluteError": 1.2000928931166222e-09
+  }
+]

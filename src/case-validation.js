@@ -110,7 +110,7 @@ function flowMonitorText(names){
 }
 function runtimeCheckFiles(c,fields){
   const sources=patchSources(),names=fluxPatchNames();
-  const config={version:1,wallSamplePatches:checked('foWallSamples')?listWords(val('foWallSamplePatches')):[],solver:c.solver.id,compressible:c.compressible,rho:num('rho'),pressure:c.pMode==='p_rgh'?'p_rgh':'p',fields:fields.map(k=>allFieldTemplates[k].object),patches:c.patches.map(p=>({...p,sources:sources.get(p.name)||[{kind:'existing',label:'既存/手動',active:true}],inletFlow:specifiedInletFlow(p)})),flow:{enabled:checked('foSurfaceFieldValue'),mode:val('foSFVMode'),names,field:val('foSFVField'),operation:val('foSFVOperation'),writeControl:val('foBasicWriteControl'),writeInterval:Number(val('foSFVInterval'))},forcePatches:checked('foForces')||checked('foForceCoeffs')?listWords(val('foForcePatches')):[],residualFields:checked('foResiduals')?residualFieldNames(c):[]};
+  const config={version:1,runMode:val('caseRunMode'),meshMotion:val('meshMotion'),wallSamplePatches:checked('foWallSamples')?listWords(val('foWallSamplePatches')):[],solver:c.solver.id,compressible:c.compressible,rho:num('rho'),pressure:c.pMode==='p_rgh'?'p_rgh':'p',fields:fields.map(k=>allFieldTemplates[k].object),patches:c.patches.map(p=>({...p,sources:sources.get(p.name)||[{kind:'existing',label:'既存/手動',active:true}],inletFlow:specifiedInletFlow(p)})),flow:{enabled:checked('foSurfaceFieldValue'),mode:val('foSFVMode'),names,field:val('foSFVField'),operation:val('foSFVOperation'),writeControl:val('foBasicWriteControl'),writeInterval:Number(val('foSFVInterval'))},forcePatches:checked('foForces')||checked('foForceCoeffs')?listWords(val('foForcePatches')):[],residualFields:checked('foResiduals')?residualFieldNames(c):[]};
   return [{path:c.caseName+'/scripts/validate_case.py',text:runtimeCheckScript},{path:c.caseName+'/system/caseBuilderChecks.json',text:JSON.stringify(config,null,2)+'\n'},{path:c.caseName+'/system/flowMonitors',text:flowMonitorText(names)}];
 }
 function updateCaseChecksUI(){
@@ -124,7 +124,7 @@ function updateCaseChecksUI(){
   $('fluxPatchHelp').textContent=val('foSFVMode')==='auto'?'Allrunで面数が1以上の実パッチへ絞り込み、個別流量と符号付き和を監視します。用途が未登録の入口・出口は自動判定しません。':'手動指定はメッシュ生成後にも存在と面数を検査し、見つからなければ停止します。';
   for(const row of $('patchTable').querySelectorAll('tbody tr')){const name=row.querySelector('[data-k="name"]').value;row.querySelector('[data-patch-source]').textContent=sources.get(name)?.map(s=>s.label+(s.active?'':'（出力無効）')).join(' / ')||'既存/手動';}
   const pressure=c.patches.filter(p=>pressurePurposes.has(p.purpose));$('boundarySetupStatus').className='note '+(caseInputWarnings(c).some(w=>w.includes('背景側'))?'warn':'');$('boundarySetupStatus').textContent=caseInputWarnings(c).filter(w=>w.includes('背景側')).join('\n')+'\n圧力条件: '+(pressure.map(p=>p.name+' ['+(sources.get(p.name)?.map(s=>s.label).join('/')||'手動')+']').join(', ')||'未設定（閉じた領域や流量収支が指定済みの系は別途確認）');
-  $('algorithmHelp').textContent=c.solver.time==='steady'?'SIMPLEの残差基準は定常反復の終了条件です。':c.solver.id==='icoFoam'?'PISOでは外部反復の残差制御を出力しません。':`PIMPLEのresidualControlは時間ステップ内の外部反復用です。${num('nOuter')===1?'外部反復上限1では残差による短縮はありません。':''}解析時間全体の終了はendTime等で指定します。`;
+  $('algorithmHelp').textContent=c.solver.time==='steady'?'SIMPLEの残差基準は定常反復の終了条件です。':['icoFoam','pisoFoam'].includes(c.solver.id)?'PISOでは外部反復の残差制御を出力しません。':`PIMPLEのresidualControlは時間ステップ内の外部反復用です。${num('nOuter')===1?'外部反復上限1では残差による短縮はありません。':''}解析時間全体の終了はendTime等で指定します。`;
   const unit=val('layerRelativeSizes')==='true'?'近傍セル寸法に対する比':'m';
   $('layerSummary').textContent=(checked('snappyLayers')?'層追加 有効':'層追加 無効')+' / 厚さ単位: '+unit+'。'+layeredPatches().map(p=>{const t=layerTotals(p.n);return `${p.name}: ${p.n}層、第一層 ${fmt(t.first)}、総厚さ ${fmt(t.total)}`;}).join(' / ')+'。形状表のlayersが既存形状への層数です。壁面解像度はyPlus出力で確認してください。';
   const lines=[],faces=allFaces();if(faces.length){const b=Geometry.bounds(faces);lines.push('メッシュ用STL全体 [m]: '+Geometry.sub(b.max,b.min).map(x=>fmt(x*num('stlScale'))).join(' × '));}
@@ -133,7 +133,7 @@ function updateCaseChecksUI(){
 }
 function caseCheckDefaults(data){
   const inputs=data.inputs||{},legacyFields='p p_rgh U T k epsilon omega alpha.water';
-  return {foInterfaceHeight:false,foWallSamples:false,foHeightLocations:'(0.005 0.007 0.025)',foHeightDirection:'(0 0 -1)',foHeightInterval:'0.01',foWallSamplePatches:'',initialU:'(0 0 0)',foResidualMode:!inputs.foResidualFields||inputs.foResidualFields===legacyFields?'auto':'manual',foSFVMode:inputs.foSFVPatch?'manual':'auto',layerRelativeSizes:'true',layerMinThickness:'0.05',layerExpansionRatio:'1.2',nCellsBetweenLevels:'3',snapTolerance:'2',snapSolveIter:'30',...inputs};
+  return {caseRunMode:'fresh',foInterfaceHeight:false,foWallSamples:false,foHeightLocations:'(0.005 0.007 0.025)',foHeightDirection:'(0 0 -1)',foHeightInterval:'0.01',foWallSamplePatches:'',initialU:'(0 0 0)',foResidualMode:!inputs.foResidualFields||inputs.foResidualFields===legacyFields?'auto':'manual',foSFVMode:inputs.foSFVPatch?'manual':'auto',layerRelativeSizes:'true',layerMinThickness:'0.05',layerExpansionRatio:'1.2',nCellsBetweenLevels:'3',snapTolerance:'2',snapSolveIter:'30',...inputs};
 }
 function vofObservationErrors(c){
   const errors=[];
