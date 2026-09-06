@@ -3,6 +3,7 @@ class STLViewer {
   constructor(canvas,onPick,options={}) {
     this.compassId=options.compassId||'viewAxes';
     this.point=null;this.onPointViewChange=options.onPointViewChange;
+    this.domain=null;this.domainCorners=[];this.onDomainViewChange=options.onDomainViewChange;
     this.canvas=canvas;this.onPick=onPick;this.faces=[];this.yaw=-0.65;this.pitch=0.45;this.zoom=1;this.pan=[0,0];
     this.gl=canvas.getContext('webgl',{antialias:true,preserveDrawingBuffer:true});
     if(!this.gl){canvas.replaceWith(Object.assign(document.createElement('p'),{textContent:'WebGLを利用できません。3D表示にはブラウザのハードウェアアクセラレーションを有効にしてください。ファイルの読み込み・辞書生成は利用できます。'}));return;}
@@ -12,6 +13,7 @@ class STLViewer {
     if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));
     this.program=p;this.pb=gl.createBuffer();this.cb=gl.createBuffer();this.gb=gl.createBuffer();this.pos=gl.getAttribLocation(p,'pos');this.col=gl.getAttribLocation(p,'color');this.mat=gl.getUniformLocation(p,'matrix');
     this.pointBuffer=gl.createBuffer();this.pointSize=gl.getUniformLocation(p,'pointSize');this.markerPass=gl.getUniformLocation(p,'markerPass');this.maxPointSize=gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1];
+    this.domainBuffer=gl.createBuffer();
     canvas.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')this.yaw-=.1;else if(e.key==='ArrowRight')this.yaw+=.1;else if(e.key==='ArrowUp')this.pitch-=.1;else if(e.key==='ArrowDown')this.pitch+=.1;else if(['+','='].includes(e.key))this.zoom=Math.min(100,this.zoom*1.15);else if(e.key==='-')this.zoom=Math.max(.05,this.zoom/1.15);else if(e.key==='Home'){this.setFaces(this.faces,true);}else return;e.preventDefault();this.draw();});
     canvas.addEventListener('contextmenu',e=>e.preventDefault());
     canvas.addEventListener('pointerdown',e=>{this.drag={x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,button:e.button};canvas.setPointerCapture(e.pointerId);});
@@ -23,7 +25,12 @@ class STLViewer {
   }
   setFaces(faces,fit=false) {
     this.faces=faces;
-    if(fit){const b=faces.length?Geometry.bounds(faces):{min:[-1,-1,-1],max:[1,1,1]};if(faces.length&&this.point)for(let i=0;i<3;i++){b.min[i]=Math.min(b.min[i],this.point[i]);b.max[i]=Math.max(b.max[i],this.point[i]);}this.center=b.min.map((x,i)=>(x+b.max[i])/2);this.radius=Math.max(Math.hypot(...Geometry.sub(b.max,b.min))/2,1e-8);this.zoom=this.fitZoom();this.pan=[0,0];}
+    if(fit){
+      const b=faces.length?Geometry.bounds(faces):this.domain?{min:[...this.domain.min],max:[...this.domain.max]}:{min:[-1,-1,-1],max:[1,1,1]};
+      const extra=[...this.domainCorners];if(faces.length&&this.point)extra.push(this.point);
+      for(const v of extra)for(let i=0;i<3;i++){b.min[i]=Math.min(b.min[i],v[i]);b.max[i]=Math.max(b.max[i],v[i]);}
+      this.center=b.min.map((x,i)=>(x+b.max[i])/2);this.radius=Math.max(Math.hypot(...Geometry.sub(b.max,b.min))/2,1e-8);this.zoom=this.fitZoom();this.pan=[0,0];
+    }
     if(!this.gl){this.draw();return;}
     const pos=new Float32Array(faces.length*9);faces.forEach((f,i)=>pos.set(f.v.flat(),i*9));this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.pb);this.gl.bufferData(this.gl.ARRAY_BUFFER,pos,this.gl.STATIC_DRAW);this.recolor();
   }
@@ -44,6 +51,23 @@ class STLViewer {
     if(redraw)this.draw();
   }
   fitZoom(){return Math.min(1,Math.max(1,this.canvas.clientWidth)/Math.max(1,this.canvas.clientHeight));}
+  setDomain(bounds,redraw=true){
+    const valid=bounds&&['min','max'].every(k=>bounds[k]?.length===3&&bounds[k].every(x=>Number.isFinite(x)&&Number.isFinite(Math.fround(x))))&&bounds.min.every((x,i)=>x<bounds.max[i]);
+    this.domain=valid?{min:[...bounds.min],max:[...bounds.max]}:null;
+    this.domainCorners=valid?Array.from({length:8},(_,n)=>[0,1,2].map(i=>(n&(1<<i))?bounds.max[i]:bounds.min[i])):[];
+    if(valid&&this.gl){
+      // Twelve box edges only: no face diagonals, surfaces or selectable geometry.
+      const lines=[];for(let n=0;n<8;n++)for(let i=0;i<3;i++)if(!(n&(1<<i)))lines.push(...this.domainCorners[n],...this.domainCorners[n|(1<<i)]);
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.domainBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,new Float32Array(lines),this.gl.DYNAMIC_DRAW);
+    }
+    if(redraw)this.draw();
+  }
+  domainViewState(){
+    if(!this.domain)return 'unset';
+    if(!this.gl)return 'unavailable';
+    if(!this.canvas.clientWidth||!this.canvas.clientHeight)return 'hidden';
+    const m=this.matrix();return this.domainCorners.every(v=>this.project(v,m).every(x=>Number.isFinite(x)&&Math.abs(x)<=1))?'onscreen':'clipped';
+  }
   pointViewState(){
     if(!this.point)return 'unset';
     if(!this.faces.length)return 'empty';
@@ -56,16 +80,22 @@ class STLViewer {
     const aspect=Math.max(1,this.canvas.clientWidth)/Math.max(1,this.canvas.clientHeight),s=.85*this.zoom/r;
     const a=[cy,0,sy],b=[sp*sy,cp,-sp*cy],z=[-cp*sy,sp,cp*cy];
     // Extend only the depth range when the point moves; preserve the user's framing.
-    const depthRadius=this.point&&this.faces.length?Math.max(r,Math.hypot(...Geometry.sub(this.point,c))):r;
+    let depthRadius=this.point&&this.faces.length?Math.max(r,Math.hypot(...Geometry.sub(this.point,c))):r;
+    for(const v of this.domainCorners)depthRadius=Math.max(depthRadius,Math.hypot(...Geometry.sub(v,c)));
     return new Float32Array([a[0]*s/aspect,b[0]*s,-z[0]/(depthRadius*4),0,a[1]*s/aspect,b[1]*s,-z[1]/(depthRadius*4),0,a[2]*s/aspect,b[2]*s,-z[2]/(depthRadius*4),0,-Geometry.dot(a,c)*s/aspect+this.pan[0],-Geometry.dot(b,c)*s+this.pan[1],Geometry.dot(z,c)/(depthRadius*4),1]);
   }
   project(v,m=this.matrix()){return [m[0]*v[0]+m[4]*v[1]+m[8]*v[2]+m[12],m[1]*v[0]+m[5]*v[1]+m[9]*v[2]+m[13],m[2]*v[0]+m[6]*v[1]+m[10]*v[2]+m[14]];}
   draw() {
     this.onPointViewChange?.(this.pointViewState());
+    this.onDomainViewChange?.(this.domainViewState());
     if(!this.gl||!this.canvas.clientWidth||!this.canvas.clientHeight)return;const gl=this.gl,canvas=this.canvas,dpr=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(canvas.clientWidth*dpr));canvas.height=Math.max(1,Math.round(canvas.clientHeight*dpr));
     gl.viewport(0,0,canvas.width,canvas.height);gl.clearColor(.045,.075,.12,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.useProgram(this.program);gl.uniformMatrix4fv(this.mat,false,this.matrix());gl.uniform1f(this.markerPass,0);gl.uniform1f(this.pointSize,1);
     gl.bindBuffer(gl.ARRAY_BUFFER,this.pb);gl.enableVertexAttribArray(this.pos);gl.vertexAttribPointer(this.pos,3,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ARRAY_BUFFER,this.cb);gl.enableVertexAttribArray(this.col);gl.vertexAttribPointer(this.col,4,gl.FLOAT,false,0,0);gl.drawArrays(gl.TRIANGLES,0,this.faces.length*3);
     if(this.guideCount){gl.bindBuffer(gl.ARRAY_BUFFER,this.gb);gl.vertexAttribPointer(this.pos,3,gl.FLOAT,false,0,0);gl.disableVertexAttribArray(this.col);gl.vertexAttrib4f(this.col,.1,.9,.85,1);gl.depthMask(false);gl.drawArrays(gl.LINES,0,this.guideCount);gl.depthMask(true);}
+    if(this.domain){
+      gl.bindBuffer(gl.ARRAY_BUFFER,this.domainBuffer);gl.vertexAttribPointer(this.pos,3,gl.FLOAT,false,0,0);gl.disableVertexAttribArray(this.col);gl.vertexAttrib4f(this.col,1,.75,.15,1);
+      gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.drawArrays(gl.LINES,0,24);gl.depthMask(true);gl.enable(gl.DEPTH_TEST);
+    }
     if(this.point&&this.faces.length){
       gl.bindBuffer(gl.ARRAY_BUFFER,this.pointBuffer);gl.vertexAttribPointer(this.pos,3,gl.FLOAT,false,0,0);gl.disableVertexAttribArray(this.col);gl.vertexAttrib4f(this.col,1,.3,.5,1);gl.uniform1f(this.pointSize,Math.min(22*dpr,this.maxPointSize));gl.depthMask(false);
       // The ring remains visible through STL; the centre is drawn only where unoccluded.
