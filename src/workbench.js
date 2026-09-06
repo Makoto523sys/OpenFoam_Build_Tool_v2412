@@ -2,13 +2,37 @@ function allFaces(){return [...geometryParts.values()].flatMap(p=>p.faces);}
 function selectedFaces(){return allFaces().filter(f=>f.selected);}
 function rememberGeometry(){geometryHistory.push({faces:allFaces().map(f=>({patch:f.patch,hidden:f.hidden,selected:!!f.selected})),patches:getPatches()});if(geometryHistory.length>20)geometryHistory.shift();}
 function fluidPointCoordinates(){const p=strictVector(val('locationInMesh')),scale=Number(val('stlScale'));return p&&Number.isFinite(scale)&&scale>0?p.map(x=>x/scale):null;}
+function backgroundMeshBounds(){
+  const min=strictVector(val('boxMin')),max=strictVector(val('boxMax')),scale=Number(val('convertToMeters'));
+  if(!min||!max||!Number.isFinite(scale)||scale<=0||min.some((x,i)=>x>=max[i]))return null;
+  return {min:min.map(x=>x*scale),max:max.map(x=>x*scale)};
+}
+function backgroundMeshDisplayBounds(){
+  const bounds=backgroundMeshBounds(),scale=Number(val('stlScale'));
+  if(!checked('includeBlockMesh')||!checked('showBackgroundMesh')||!bounds||!Number.isFinite(scale)||scale<=0)return null;
+  return {min:bounds.min.map(x=>x/scale),max:bounds.max.map(x=>x/scale)};
+}
+function updateBackgroundMeshStatus(state){
+  let text;
+  if(!checked('includeBlockMesh'))text='blockMeshDictの出力が無効です。既存メッシュの範囲は表示しません。';
+  else if(!checked('showBackgroundMesh'))text='背景領域の枠線を非表示にしています。';
+  else if(state==='unset')text='背景領域を表示できません。boxMin < boxMax、convertToMeters、STLの単位を確認してください。';
+  else {
+    const b=backgroundMeshBounds();text='背景領域 [m]: '+['X','Y','Z'].map((axis,i)=>`${axis} ${fmt(b.min[i])} ～ ${fmt(b.max[i])}`).join(' / ');
+    if(state==='clipped')text+='。画面外の部分があります。「STL・点・背景を全体表示」で確認できます。';
+    if(state==='unavailable')text+='。3D表示を利用できません。';
+  }
+  const el=$('backgroundMeshStatus');if(el.textContent!==text)el.textContent=text;
+  $('backgroundMeshLegend').hidden=!['onscreen','clipped'].includes(state);
+}
+function syncViewerOverlays(){viewer.setPoint(fluidPointCoordinates(),false);viewer.setDomain(backgroundMeshDisplayBounds(),false);}
 function updateFluidPointStatus(state){
-  const messages={unset:'保持点を表示できません。(x y z) の有限な座標 [m] と、STLの単位を確認してください。',empty:'メッシュ用STLを読み込むと保持点を表示します。',unavailable:'3D表示を利用できません。座標値は辞書へ反映されます。',hidden:'3D画面を表示すると保持点を確認できます。',offscreen:'保持点は現在の画面外です。「STLと点を全体表示」で確認できます。',onscreen:'ピンクの保持点を表示中。座標の変更は点とsnappyHexMeshDictへ反映されます。'};
+  const messages={unset:'保持点を表示できません。(x y z) の有限な座標 [m] と、STLの単位を確認してください。',empty:'メッシュ用STLを読み込むと保持点を表示します。',unavailable:'3D表示を利用できません。座標値は辞書へ反映されます。',hidden:'3D画面を表示すると保持点を確認できます。',offscreen:'保持点は現在の画面外です。「STL・点・背景を全体表示」で確認できます。',onscreen:'ピンクの保持点を表示中。座標の変更は点とsnappyHexMeshDictへ反映されます。'};
   const el=$('fluidPointStatus');if(el.textContent!==messages[state])el.textContent=messages[state];
   $('fluidPointLegend').hidden=!['onscreen','offscreen'].includes(state);
   $('locationInMesh').setAttribute('aria-invalid',String(state==='unset'));
 }
-function refreshViewer(fit=false){if(viewer){viewer.setPoint(fluidPointCoordinates(),false);viewer.setFaces(allFaces(),fit);}if(workbenchReady){renderParts();updateSelection();}}
+function refreshViewer(fit=false){if(viewer){syncViewerOverlays();viewer.setFaces(allFaces(),fit);}if(workbenchReady){renderParts();updateSelection();}}
 function updateSelection(){
   const fs=selectedFaces(),scale=Number(val('stlScale')),m=Geometry.measure(fs);
   $('selectionStatus').textContent=fs.length?`${fs.length.toLocaleString()} 三角形を選択 / 面積 ${fmt(m.area*scale*scale)} m² / ${[...new Set(fs.map(f=>f.patch))].join(', ')}`:'面を選択してください。';
@@ -63,15 +87,21 @@ function patchDefaults(name,purpose='wallNoSlip') {return {name,purpose,U:'(0 0 
 function patchRow(name){return [...$('patchTable').querySelectorAll('tbody tr')].find(tr=>tr.querySelector('[data-k="name"]').value===name);}
 function upsertPatch(p){const row=patchRow(p.name);if(row){for(const [k,v] of Object.entries(p)){const el=row.querySelector(`[data-k="${k}"]`);if(el)el.value=v;}}else addPatch({...patchDefaults(p.name),...p});}
 function purposeType(purpose){return ['empty','symmetryPlane','symmetry','wedge','cyclic','cyclicAMI'].includes(purpose)?purpose:/wall/i.test(purpose)?'wall':'patch';}
-function syncVisualPatches(){
+function meshPatchRequirements(){
   const required=new Map();
   if(checked('includeBlockMesh'))for(const g of blockMeshGroupedPatches())required.set(g.name,blockMeshPatchPurpose(g.name,g.type));
   if(checked('includeSnappy'))for(const p of geometryParts.values())for(const f of p.faces)required.set(f.patch,'wallNoSlip');
   if(val('meshMotion')==='ami'){required.set('rotorAMI','cyclicAMI');required.set('statorAMI','cyclicAMI');}
-  const existing=new Map(getPatches().map(p=>[p.name,p]));
-  for(const [name,purpose] of required){if(!existing.has(name))addPatch({...patchDefaults(name,purpose),U:purpose==='velocityInlet'?'(1 0 0)':'(0 0 0)'});}
-  for(const name of managedPatchNames)if(!required.has(name))patchRow(name)?.remove();
-  managedPatchNames=new Set(required.keys());
+  return required;
+}
+function syncVisualPatches(addMissing=false){
+  const required=meshPatchRequirements(),existing=new Set(getPatches().map(p=>p.name)),compressible=cfg().compressible;
+  for(const name of managedPatchNames)if(!required.has(name)){patchRow(name)?.remove();managedPatchNames.delete(name);}
+  if(addMissing)for(const [name,purpose] of required)if(!existing.has(name)){
+    const p=patchDefaults(name,purpose);if(purpose==='velocityInlet')p.U=p.normal=blockMeshInletDirection(name);
+    if(compressible&&purpose==='pressureOutlet')p.p='101325';
+    addPatch(p);managedPatchNames.add(name);
+  }
 }
 function assignVisualPatch(){
   const fs=selectedFaces(),name=val('visualPatchName').trim();
@@ -83,10 +113,16 @@ function assignVisualPatch(){
   rememberGeometry();fs.forEach(f=>f.patch=name);
   const m=Geometry.measure(fs),scale=Number(val('stlScale'));
   upsertPatch({...patchDefaults(name,val('visualPurpose')),U:val('visualU'),Q:val('visualQ'),mdot:val('visualMdot'),p:val('visualP'),T:val('visualT'),alpha:val('visualAlpha'),area:fmt(m.area*scale*scale),normal:'('+m.normal.join(' ')+')'});
-  generate();refreshViewer();setStatus(`${name} を ${fs.length} 三角形に割り当てました。STL・snappyHexMeshDict・0/のパッチ名を同期します。`);
+  managedPatchNames.add(name);generate();refreshViewer();setStatus(`${name} を ${fs.length} 三角形に割り当てました。STL・snappyHexMeshDict・0/のパッチ名を同期します。`);
 }
 function setStatus(text){$('geometryStatus').textContent=text;}
-function setFlow(axis){setBlockMeshPreset(axis);const v=['x','y','z'].map(a=>a===axis?1:0);syncVisualPatches();upsertPatch({name:'inlet',purpose:'velocityInlet',U:'('+v.join(' ')+')',normal:'('+v.join(' ')+')'});generate();}
+function setFlow(axis){
+  setBlockMeshPreset(axis);
+  const v='('+['x','y','z'].map(a=>a===axis?1:0).join(' ')+')';
+  // Direction changes edit registered conditions, but never recreate deleted rows.
+  if(patchRow('inlet'))upsertPatch({name:'inlet',purpose:'velocityInlet',U:v,normal:v});
+  generate();
+}
 function fitDomain(){
   const fs=allFaces();if(!fs.length)return;const b=Geometry.bounds(fs),scale=Number(val('stlScale'));const extent=Geometry.sub(b.max,b.min),floor=Math.max(...extent)*.2;
   const min=b.min.map((x,i)=>(x-Math.max(extent[i]*.2,floor*.1))*scale),max=b.max.map((x,i)=>(x+Math.max(extent[i]*.2,floor*.1))*scale);
@@ -103,7 +139,7 @@ function surfaceRegionEntries(g){
 }
 function updateWorkbenchStatus(){
   const mode=val('meshMotion'),s=cfg();
-  if(viewer){const scale=Number(val('stlScale'))||1;viewer.setPoint(fluidPointCoordinates(),false);viewer.setGuide(['ami','mrf'].includes(mode)?rotorSurface().map(f=>({...f,v:f.v.map(v=>v.map(x=>x/scale))})):[]);if(!viewer.gl)viewer.draw();}
+  if(viewer){const scale=Number(val('stlScale'))||1;syncViewerOverlays();viewer.setGuide(['ami','mrf'].includes(mode)?rotorSurface().map(f=>({...f,v:f.v.map(v=>v.map(x=>x/scale))})):[]);if(!viewer.gl)viewer.draw();}
   $('rotationControls').classList.toggle('hidden',!['mrf','ami','rigid'].includes(mode));$('refineControls').classList.toggle('hidden',mode!=='refine');
   const messages={static:'固定メッシュを生成します。',mrf:'円筒内のcellZoneとMRFPropertiesを生成します。メッシュ自体は動きません。回転壁はMRFが処理します。静止面はnonRotatingPatchesへ指定してください。',ami:'閉じた円筒STLでrotorZoneを作り、境界面をcyclicAMIの対へ変換します。円筒は回転部品を囲み、背景境界・静止物体と交差させないでください。生成後はAMIの面数・補間重みと回転後のメッシュ品質を確認してください。',rigid:'計算領域全体が回転します。回転部品だけを動かす場合はAMIを選択してください。壁の用途は移動壁を使用します。',refine:'interFoamのalpha.water界面に合わせて細分化・粗大化します。壁への適合やy+を自動設計する機能ではありません。snappyでできた非六面体セルなどは細分化できない場合があります。'};
   $('motionStatus').textContent=messages[mode]+(mode!=='static'?` 選択中: ${s.solver.id}。`:'');
@@ -189,7 +225,7 @@ function buildAllrun(c){
   if(num('nProc')>1)commands.push('runApplication decomposePar',`runParallel -np ${val('nProc')} ${c.solver.id}`,'runApplication reconstructPar');else commands.push(`runApplication ${c.solver.id}`);
   return `#!/bin/sh\nset -e\ncd "\${0%/*}" || exit 1\n. "\${WM_PROJECT_DIR:?Source OpenFOAM v2412 first}/bin/tools/RunFunctions"\n[ "\${WM_PROJECT_VERSION:-}" = v2412 ] || { echo "OpenFOAM v2412 is required" >&2; exit 1; }\n${commands.join('\n')}\ntouch ${c.caseName}.foam\n`;
 }
-function caseGuide(c){return auxiliaryGuide(c)+`# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Region names match the boundary-condition table.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
+function caseGuide(c){return auxiliaryGuide(c)+`# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Register the mesh boundary regions in the boundary-condition table before using the case.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
 function projectSnapshot(){const inputs={};document.querySelectorAll('input[id],select[id],textarea[id]').forEach(el=>{if(!['file'].includes(el.type)&&!['previewText','previewSelect','applicationMirror','fieldAddSelect'].includes(el.id))inputs[el.id]=el.type==='checkbox'?el.checked:el.value;});const data={format:'OpenFOAM-Case-Builder',version:3,auxiliary:auxiliaryProjectData(),inputs,patches:getPatches(),geometries:getGeometries(),parts:[...geometryParts.values()].map(p=>({file:p.file,originalName:p.originalName,faces:p.faces.map(f=>({v:f.v,region:f.region,patch:f.patch,hidden:f.hidden}))})),manualFields};return data;}
 function saveProject(){if(auxiliaryBusy){setStatus('CSV / 初期水領域STLの読み込み完了を待ってください。');return;}const data=projectSnapshot();saveBlob(new Blob([JSON.stringify(data)],{type:'application/json'}),sanitizeCaseName(val('caseName'))+'.project.json');}
 function restoreProject(data){
@@ -197,11 +233,11 @@ function restoreProject(data){
   if(data.parts.reduce((n,p)=>n+(p.faces?.length||0),0)>750000)throw Error('作業ファイルの三角形数が上限を超えています。');
   const auxiliaryStaged=stageAuxiliaryProject(data);
   const staged=new Map();for(const p of data.parts){if(!/^[A-Za-z_][A-Za-z0-9_]*\.stl$/.test(p.file)||staged.has(p.file))throw Error('作業ファイルのSTL名が不正です。');const faces=p.faces.map(f=>({...Geometry.triangle(f.v,f.region),patch:Geometry.word(f.patch),hidden:!!f.hidden,file:p.file}));staged.set(p.file,{file:p.file,originalName:p.originalName,faces,topology:Geometry.topology(faces)});}
-  for(const [id,value] of Object.entries(auxiliaryProjectInputs(data))){const el=$(id);if(!el||el.type==='file'||!el.matches('input,select,textarea')||['previewText','previewSelect','applicationMirror'].includes(id))continue;if(el.type==='checkbox')el.checked=!!value;else el.value=String(value);}
+  for(const [id,value] of Object.entries({showBackgroundMesh:true,...auxiliaryProjectInputs(data)})){const el=$(id);if(!el||el.type==='file'||!el.matches('input,select,textarea')||['previewText','previewSelect','applicationMirror'].includes(id))continue;if(el.type==='checkbox')el.checked=!!value;else el.value=String(value);}
   if(!solverDb.some(s=>s.id===val('solver')))$('solver').value='pimpleFoam';applySolverDefaults(val('solver'));
   $('patchTable').querySelector('tbody').innerHTML='';data.patches.forEach(p=>addPatch({...patchDefaults('patch'),...p}));
   $('geometryTable').querySelector('tbody').innerHTML='';data.geometries.forEach(addGeometry);geometryParts.clear();selectedGeometryFiles.clear();for(const [name,p] of staged){geometryParts.set(name,p);selectedGeometryFiles.set(name,true);}
-  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set();geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();setStatus('作業を復元しました。');
+  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set(getPatches().map(p=>p.name).filter(name=>meshPatchRequirements().has(name)));geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();setStatus('作業を復元しました。');
 }
 function demoGeometry(){
   if(geometryParts.size){setStatus('デモを追加する前に作業を保存し、形状一覧の初期化で既存形状を解除してください。');return;}
@@ -212,7 +248,7 @@ function demoGeometry(){
 function initWorkbench(){
   const picker=$('geometryFilesPicker');$('stlPickerSlot').append(picker.parentElement);
   $('visualPurpose').innerHTML=patchPurposes.filter(([k])=>!['cyclic','cyclicAMI','wedge','empty','symmetry','interface'].includes(k)).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
-  viewer=new STLViewer($('stlCanvas'),pickFace,{onPointViewChange:updateFluidPointStatus});viewer.setFaces([],true);workbenchReady=true;
+  viewer=new STLViewer($('stlCanvas'),pickFace,{onPointViewChange:updateFluidPointStatus,onDomainViewChange:updateBackgroundMeshStatus});syncViewerOverlays();viewer.setFaces([],true);workbenchReady=true;
   const bind=(id,fn)=>$(id).addEventListener('click',fn);
   for(const axis of ['X','Y','Z','Iso'])bind('view'+axis,()=>viewer.view(axis.toLowerCase()));
   bind('fitGeometry',()=>refreshViewer(true));bind('assignVisualPatch',assignVisualPatch);bind('demoGeometry',demoGeometry);

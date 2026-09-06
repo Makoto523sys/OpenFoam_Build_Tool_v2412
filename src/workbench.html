@@ -4,9 +4,15 @@
     <div>
       <div id="stlPickerSlot"></div>
       <div class="btns"><button id="demoGeometry" class="light">内部ノズルの例を表示</button><button id="viewX" class="ghost">Xから</button><button id="viewY" class="ghost">Yから</button><button id="viewZ" class="ghost">Zから</button><button id="viewIso" class="ghost">斜め</button></div>
-      <div class="viewport"><canvas id="stlCanvas" aria-label="STLと保持点の3Dビュー：クリックで面選択、ドラッグで回転、右ドラッグで移動、ホイールで拡大。キーボード：矢印で回転、+/-で拡大縮小、HomeでSTLと点を全体表示" tabindex="0"></canvas><svg id="viewAxes" viewBox="0 0 90 90" aria-label="座標軸"></svg><div id="fluidPointLegend" hidden><span aria-hidden="true"></span>locationInMesh</div><div class="view-help">クリック：選択 / Ctrl・Shift：追加選択 / ドラッグ：回転 / 右ドラッグ：移動 / ホイール：拡大</div></div>
+      <div class="viewport"><canvas id="stlCanvas" aria-label="STL・保持点・背景領域の3Dビュー：クリックで面選択、ドラッグで回転、右ドラッグで移動、ホイールで拡大。キーボード：矢印で回転、+/-で拡大縮小、HomeでSTL・点・背景を全体表示" tabindex="0"></canvas><svg id="viewAxes" viewBox="0 0 90 90" aria-label="座標軸"></svg><div id="fluidPointLegend" hidden><span aria-hidden="true"></span>locationInMesh</div><div id="backgroundMeshLegend" hidden><span aria-hidden="true"></span>blockMesh 背景領域</div><div class="view-help">クリック：選択 / Ctrl・Shift：追加選択 / ドラッグ：回転 / 右ドラッグ：移動 / ホイール：拡大</div></div>
+      <div class="background-mesh-controls">
+        <label class="inlineCheck" for="showBackgroundMesh"><input id="showBackgroundMesh" type="checkbox" checked aria-describedby="backgroundMeshHelp">背景メッシュの範囲を表示</label>
+        <a href="#backgroundMeshSettings">背景領域の座標・縮尺を編集</a>
+        <p id="backgroundMeshStatus" class="hint" role="status" aria-live="polite"></p>
+        <p id="backgroundMeshHelp" class="hint">黄色の枠線がblockMeshで作る領域の外周です。枠線はSTL越しにも表示します。セルの分割線は表示しません。表示をオフにしてもメッシュ設定は保持されます。</p>
+      </div>
       <div id="fluidPointControls" class="fluid-point-controls">
-        <div class="fluid-point-row"><div><label for="locationInMesh">流体として残す領域の保持点 locationInMesh [m]</label><input id="locationInMesh" value="(0 0 0)" placeholder="(x y z)" spellcheck="false" aria-describedby="fluidPointHelp fluidPointStatus"></div><button id="fitGeometry" class="ghost">STLと点を全体表示</button></div>
+        <div class="fluid-point-row"><div><label for="locationInMesh">流体として残す領域の保持点 locationInMesh [m]</label><input id="locationInMesh" value="(0 0 0)" placeholder="(x y z)" spellcheck="false" aria-describedby="fluidPointHelp fluidPointStatus"></div><button id="fitGeometry" class="ghost">STL・点・背景を全体表示</button></div>
         <p id="fluidPointStatus" class="hint" role="status" aria-live="polite"></p>
         <p id="fluidPointHelp" class="hint">座標は (x y z) をメートルで入力します。ピンクの点は1つだけ表示し、編集すると移動します。輪郭だけの点はSTLに隠れた位置、中央も塗られた点は見えている位置です。X・Y・Zからの表示や面の非表示で位置を確認してください。保持点は流体領域内に置き、STL表面上を避けてください。内外の自動判定は行いません。</p>
       </div>
@@ -25,6 +31,7 @@
       <button id="assignVisualPatch" class="green">選択面にパッチ・境界条件を割り当て</button>
       <details><summary>領域と流れ方向</summary>
         <div class="btns"><button id="fitDomain" class="light">STLから背景領域を設定</button><button id="flowX">流れ +X</button><button id="flowY">流れ +Y</button><button id="flowZ">流れ +Z</button></div>
+        <p class="hint">流れ方向は背景面と登録済みのinletに反映します。境界条件を追加する場合は、4番の「形状・背景から追加」を押してください。</p>
         <p class="hint">背景領域はSTL外接箱に余白20%を付けて設定します。内部流れでは、保持点を容器内の流体側に指定してください。</p>
         <label for="fluidOffset">選択面中心からの距離 [m]（STL法線方向が正）</label><input id="fluidOffset" type="number" step="any" value="0.001"><button id="setFluidPoint" class="ghost">選択面からlocationInMeshを設定</button>
       </details>
