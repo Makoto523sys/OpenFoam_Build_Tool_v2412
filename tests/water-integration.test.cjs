@@ -70,7 +70,7 @@ test('initial-water STL has a dedicated output path and never creates mesh geome
     assert.doesNotMatch(a.file('system/setFieldsDict'), /boxToCell/);
     assert.doesNotMatch(a.file('0/alpha.water'), /initialFill|initialWater/);
     const allrun = a.file('Allrun');
-    assert.ok(allrun.indexOf('snappyHexMesh') < allrun.indexOf('runApplication setFields'));
+    assert.ok(allrun.indexOf('snappyHexMesh') < allrun.indexOf('runFresh setFields'));
     assert.equal(a.errors.length, 0);
   } finally {a.close();}
 });

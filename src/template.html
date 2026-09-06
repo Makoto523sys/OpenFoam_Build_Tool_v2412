@@ -48,7 +48,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
 <body>
 <header>
   <h1>OpenFOAM v2412 Case Builder v8.4</h1>
-  <p id="buildRevision">境界パッチ登録・削除 修正版 ／ 6方向ビュー・角度指定・STLからの背景範囲自動設定</p>
+  <p id="buildRevision">境界パッチ登録・削除 修正版 ／ 6方向ビュー・角度指定・STLからの背景範囲自動設定 ／ v2412実行前検査 修正版</p>
   <p>STLを見ながら面と境界条件を設定し、OpenFOAM v2412のケースを生成します。回転メッシュ・VOF適合細分化・初期水STL・加速度CSV・作業保存に対応。HTMLを直接開いて使えます。</p>
 </header>
 
@@ -157,7 +157,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
         <div><label class="help" data-help="最大Courant数です。まず流すなら0.5程度、LESでは格子と時間精度に合わせて管理します。">maxCo</label><input id="maxCo" type="number" step="any" value="0.5" /></div>
         <div><label class="help" data-help="VOF相分率の最大Courant数です。界面安定化のため0.1〜0.3程度から開始します。">maxAlphaCo</label><input id="maxAlphaCo" type="number" step="any" value="0.25" /></div>
         <div><label class="help" data-help="adjustTimeStep=yesで許す最大deltaTです。0以下なら出力しません。">maxDeltaT</label><input id="maxDeltaT" type="number" step="any" value="0" /></div>
-        <div><label class="help" data-help="solver logの標準出力設定です。通常は1です。">InfoSwitch level</label><input id="infoLevel" type="number" value="1" /></div>
+        <div><label for="initialU">初期内部速度 U [m/s]</label><input id="initialU" value="(0 0 0)" /></div>
       </div>
     </section>
 
@@ -167,7 +167,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
       <details open>
         <summary>基本監視</summary>
         <div class="grid3">
-          <div><label class="inlineCheck"><input id="foResiduals" type="checkbox" checked /> residuals</label><label class="help" data-help="残差監視対象fieldです。存在しないfieldはOpenFOAM側でエラーになることがあるため生成fieldと整合させてください。">fields</label><input id="foResidualFields" value="p p_rgh U T k epsilon omega alpha.water" /></div>
+          <div><label class="inlineCheck"><input id="foResiduals" type="checkbox" checked /> 残差監視 solverInfo</label><label for="foResidualMode">監視対象</label><select id="foResidualMode"><option value="auto">ソルバー・モデルから自動選択</option><option value="manual">手動指定</option></select><label for="foResidualFields">fields（空白区切り）</label><input id="foResidualFields" value="" /><p id="residualFieldsHelp" class="hint"></p></div>
           <div><label class="inlineCheck"><input id="foCourant" type="checkbox" checked /> CourantNo</label><label class="help" data-help="functionObjectのwriteControlです。timeStep/runTime/writeTimeなど。">writeControl</label><select id="foBasicWriteControl"><option>timeStep</option><option>runTime</option><option>writeTime</option></select></div>
           <div><label class="inlineCheck"><input id="foYPlus" type="checkbox" /> yPlus</label><label class="help" data-help="functionObjectのwriteIntervalです。writeControlに対する間隔です。">writeInterval</label><input id="foBasicWriteInterval" type="number" value="1" /></div>
         </div>
@@ -229,9 +229,9 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
       <details>
         <summary>流量・体積集計</summary>
         <div class="grid4">
-          <div><label class="inlineCheck"><input id="foSurfaceFieldValue" type="checkbox" checked /> patch流量集計</label><label class="help" data-help="集計対象patchです。出口流量やphiの総和確認に使います。">patch</label><input id="foSFVPatch" value="outlet" /></div>
-          <div><label class="help" data-help="集計するsurfaceFieldです。非圧縮ではphi、圧縮性ではrhoPhi等を使います。">field</label><input id="foSFVField" value="phi" /></div>
-          <div><label class="help" data-help="sum/areaAverage/weightedAreaAverageなど。流量収支はsumが基本です。">operation</label><select id="foSFVOperation"><option>sum</option><option>areaAverage</option><option>weightedAreaAverage</option><option>min</option><option>max</option></select></div>
+          <div><label class="inlineCheck"><input id="foSurfaceFieldValue" type="checkbox" checked /> 入口・出口の流量監視</label><label for="foSFVMode">対象の選び方</label><select id="foSFVMode"><option value="auto">登録した入口・出口から自動選択</option><option value="manual">手動指定（複数可）</option></select><label for="foSFVPatch">patch名（空白区切り）</label><input id="foSFVPatch" value="" /><label for="foPatchCandidate">パッチ候補（出所付き）</label><select id="foPatchCandidate"></select><button id="addFluxPatch" type="button" class="light">候補を監視対象に追加</button><p id="fluxPatchHelp" class="hint"></p></div>
+          <div><label for="foSFVField">流束field</label><select id="foSFVField"><option value="phi">phi（単相非圧縮: m³/s・圧縮性: kg/s）</option><option value="rhoPhi">rhoPhi（VOFの質量流束: kg/s）</option></select><p class="hint">外向きが正、流入は負。sumの場合、個別パッチと選択パッチ全体の符号付き和を出力します。非定常圧縮性では領域内の質量変化も収支に含めます。</p></div>
+          <div><label class="help" data-help="流束phiの流量収支にはsumを使います。">operation</label><select id="foSFVOperation"><option>sum</option><option>areaAverage</option><option>min</option><option>max</option></select></div>
           <div><label class="help" data-help="出力intervalです。">interval</label><input id="foSFVInterval" type="number" value="1" /></div>
         </div>
         <div class="grid4">
@@ -254,7 +254,7 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
         <div><label class="help" data-help="laplacianの非直交補正。非直交が大きいとlimited correctedが安全です。">laplacian</label><select id="laplacianScheme"><option>Gauss linear corrected</option><option>Gauss linear limited corrected 0.5</option><option>Gauss linear limited corrected 0.333</option><option>Gauss linear orthogonal</option></select></div>
         <div><label class="help" data-help="snGrad補正。メッシュ品質が悪い場合はlimited correctedを検討します。">snGrad</label><select id="snGradScheme"><option>corrected</option><option>limited corrected 0.5</option><option>limited corrected 0.333</option><option>orthogonal</option></select></div>
         <div><label class="help" data-help="PIMPLE/SIMPLEの非直交補正回数です。">nNonOrthCorr</label><input id="nNonOrth" type="number" value="1" /></div>
-        <div><label class="help" data-help="PIMPLE outer corrector数。強連成や大きいΔtでは2以上を検討します。">nOuterCorr</label><input id="nOuter" type="number" value="1" /></div>
+        <div><label class="help" data-help="PIMPLEの各時間ステップ内の外部反復上限。1では外部反復の残差による短縮はありません。residualControlは解析時間全体を終了する基準ではありません。">nOuterCorr</label><input id="nOuter" type="number" value="1" /><p id="algorithmHelp" class="hint"></p></div>
       </div>
       <div class="grid4">
         <div><label class="help" data-help="PIMPLE/PISOの圧力補正回数です。">nCorrectors</label><input id="nCorrectors" type="number" value="2" /></div>
@@ -300,12 +300,12 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
           <button id="bmSyncPatches" class="secondary">0ディレクトリpatch表へ反映</button>
         </div>
         <div class="tableWrap"><table id="blockFaceTable"><thead><tr><th>面</th><th>座標側</th><th>patch名</th><th>blockMesh type</th><th>対応face頂点</th></tr></thead><tbody>
-          <tr><td>X-</td><td>x = min</td><td><input id="bmXMinusName" value="inlet" title="X-側のpatch名です。既定はinlet。"></td><td><select id="bmXMinusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 4 7 3)</td></tr>
-          <tr><td>X+</td><td>x = max</td><td><input id="bmXPlusName" value="outlet" title="X+側のpatch名です。既定はoutlet。"></td><td><select id="bmXPlusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(1 2 6 5)</td></tr>
-          <tr><td>Y-</td><td>y = min</td><td><input id="bmYMinusName" value="walls" title="Y-側のpatch名です。"></td><td><select id="bmYMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 1 5 4)</td></tr>
-          <tr><td>Y+</td><td>y = max</td><td><input id="bmYPlusName" value="walls" title="Y+側のpatch名です。Y-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmYPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(3 7 6 2)</td></tr>
-          <tr><td>Z-</td><td>z = min</td><td><input id="bmZMinusName" value="walls" title="Z-側のpatch名です。2D計算ではfrontAndBackなどにしてemptyを選ぶことが多いです。"></td><td><select id="bmZMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 3 2 1)</td></tr>
-          <tr><td>Z+</td><td>z = max</td><td><input id="bmZPlusName" value="walls" title="Z+側のpatch名です。Z-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmZPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option><option>wedge</option></select></td><td class="mono">(4 5 6 7)</td></tr>
+          <tr><td>X-</td><td>x = min</td><td><input id="bmXMinusName" value="inlet" title="X-側のpatch名です。既定はinlet。"></td><td><select id="bmXMinusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 4 7 3)</td></tr>
+          <tr><td>X+</td><td>x = max</td><td><input id="bmXPlusName" value="outlet" title="X+側のpatch名です。既定はoutlet。"></td><td><select id="bmXPlusType"><option>patch</option><option>wall</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(1 2 6 5)</td></tr>
+          <tr><td>Y-</td><td>y = min</td><td><input id="bmYMinusName" value="walls" title="Y-側のpatch名です。"></td><td><select id="bmYMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 1 5 4)</td></tr>
+          <tr><td>Y+</td><td>y = max</td><td><input id="bmYPlusName" value="walls" title="Y+側のpatch名です。Y-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmYPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(3 7 6 2)</td></tr>
+          <tr><td>Z-</td><td>z = min</td><td><input id="bmZMinusName" value="walls" title="Z-側のpatch名です。2D計算ではfrontAndBackなどにしてemptyを選ぶことが多いです。"></td><td><select id="bmZMinusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(0 3 2 1)</td></tr>
+          <tr><td>Z+</td><td>z = max</td><td><input id="bmZPlusName" value="walls" title="Z+側のpatch名です。Z-と同じ名前なら1つのpatchにfacesがまとめられます。"></td><td><select id="bmZPlusType"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option><option>wedge</option></select></td><td class="mono">(4 5 6 7)</td></tr>
         </tbody></table></div>
         <div class="note warn">同じpatch名を複数面に使う場合、blockMesh typeは同じにしてください。例: Y±/Z±をすべて <span class="mono">walls / wall</span> にすると1つのwalls patchへ結合します。</div>
       </details>
@@ -320,8 +320,13 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
         <div><label class="help" data-help="新しく追加する形状行の表面refinement最小levelです。各行でも個別に変更できます。">default surfaceLevelMin</label><input id="surfaceLevelMin" type="number" value="2" /></div>
         <div><label class="help" data-help="新しく追加する形状行の表面refinement最大levelです。各行でも個別に変更できます。">default surfaceLevelMax</label><input id="surfaceLevelMax" type="number" value="3" /></div>
         <div><label class="help" data-help="新しく追加する形状行の境界層数です。0ならその形状にはlayerを張りません。">default nSurfaceLayers</label><input id="nSurfaceLayers" type="number" value="3" /></div>
-        <div><label class="help" data-help="最終層厚さです。relativeSizes=trueでは近傍セルサイズに対する比です。全形状共通です。">finalLayerThickness</label><input id="finalLayerThickness" type="number" step="any" value="0.35" /></div>
+        <div><label for="layerRelativeSizes">層厚の指定</label><select id="layerRelativeSizes"><option value="true">相対値：近傍セル寸法に対する比</option><option value="false">絶対値：m</option></select></div>
+        <div><label for="finalLayerThickness">最外層の厚さ（比 / m）</label><input id="finalLayerThickness" type="number" step="any" value="0.35" /></div>
+        <div><label for="layerMinThickness">許容する最小総厚さ（比 / m）</label><input id="layerMinThickness" type="number" step="any" value="0.05" /></div>
+        <div><label for="layerExpansionRatio">層の膨張率</label><input id="layerExpansionRatio" type="number" step="any" value="1.2" /></div>
       </div>
+      <p id="layerSummary" class="hint"></p>
+      <details><summary>メッシュ品質の調整と不合格箇所の確認</summary><p class="hint">AllrunはcheckMeshを毎回実行し、不合格なら計算を止めます。凹セル・凹面はlog.checkMeshとVTK出力で位置を確認してください。原因を確認して形状の角、細分化遷移、スナップを調整します。品質閾値は自動では緩和しません。</p><div class="grid3"><div><label for="nCellsBetweenLevels">細分化レベル間のセル数</label><input id="nCellsBetweenLevels" type="number" min="1" value="3"></div><div><label for="snapTolerance">snap tolerance（局所辺長の倍率）</label><input id="snapTolerance" type="number" min="0" step="any" value="2"></div><div><label for="snapSolveIter">snap nSolveIter</label><input id="snapSolveIter" type="number" min="1" value="30"></div></div></details>
       <div class="btns" style="margin:10px 0">
         <button id="addGeometry" class="light">形状行を追加</button>
         <button id="resetGeometries" class="ghost">標準形状へ戻す</button>
@@ -390,9 +395,9 @@ const rasModels = ['kOmegaSST','kEpsilon','realizableKE','RNGkEpsilon','SpalartA
 const lesModels = ['Smagorinsky','WALE','dynamicKEqn','kEqn','SpalartAllmarasDDES','SpalartAllmarasIDDES','kOmegaSSTDES','kOmegaSSTIDDES'];
 const patchPurposes = [
   ['velocityInlet','速度入口 fixedValue'],['volumetricFlowRateInlet','体積流量入口 flowRateInletVelocity'],['massFlowRateInlet','質量流量入口 flowRateInletVelocity'],['pressureInlet','圧力入口'],['totalPressureInlet','全圧入口'],
-  ['pressureOutlet','圧力出口 fixedValue'],['inletOutlet','逆流許容出口 inletOutlet'],['volumetricFlowRateOutlet','体積流量出口 flowRateOutletVelocity'],['massFlowRateOutlet','質量流量出口 flowRateOutletVelocity'],['outletZeroGradient','出口 zeroGradient'],
+  ['pressureOutlet','圧力出口 fixedValue'],['inletOutlet','逆流許容出口 inletOutlet'],['volumetricFlowRateOutlet','体積流量出口 flowRateOutletVelocity'],['massFlowRateOutlet','質量流量出口 flowRateOutletVelocity'],['outletZeroGradient','出口 U・pゼロ勾配（圧力基準を別途確認）'],
   ['wallNoSlip','壁 noSlip'],['wallSlip','壁 slip'],['movingWall','移動壁 movingWallVelocity'],['roughWall','粗面壁'],['thermalWall','温度固定壁'],
-  ['symmetryPlane','symmetryPlane'],['symmetry','symmetry'],['empty','empty 2D'],['wedge','wedge 軸対称'],['cyclic','cyclic 周期'],['cyclicAMI','cyclicAMI 非一致周期'],['interface','界面/一般patch'],['atmosphere','大気開放/VOF'],['genericPatch','一般patch']
+  ['symmetryPlane','対称平面 symmetryPlane（共通法線）'],['symmetry','対称 symmetry（面ごとの法線）'],['empty','empty 2D（厚み1セル）'],['wedge','wedge 軸対称'],['cyclic','cyclic 周期'],['cyclicAMI','cyclicAMI 非一致周期'],['interface','界面/一般patch'],['atmosphere','大気開放/VOF'],['genericPatch','一般patch']
 ];
 const allFieldTemplates = {
   U:{object:'U', className:'volVectorField', dims:'[0 1 -1 0 0 0 0]', internal:'uniform (0 0 0)', kind:'vector', desc:'速度'},
@@ -453,7 +458,7 @@ function init(){
 }
 function bindEvents(){
   document.querySelectorAll('input,select,textarea').forEach(el=>{
-    if(el.type==='file'||['previewText','previewSelect','applicationMirror','geometryFilesPicker','projectPicker','selectionAngle','selectionMode','domainMarginPercent'].includes(el.id)||el.id.startsWith('visual')||el.id.startsWith('viewRotate')) return;
+    if(el.type==='file'||['previewText','previewSelect','applicationMirror','geometryFilesPicker','projectPicker','selectionAngle','selectionMode','domainMarginPercent','foPatchCandidate'].includes(el.id)||el.id.startsWith('visual')||el.id.startsWith('viewRotate')) return;
     el.addEventListener('input',()=>{ if(el.id==='solver') applySolverDefaults(el.value); if(el.id==='material') applyMaterial('material'); if(el.id==='material2') syncSigmaFromVOF(); if(['turbulenceType','rasModel','lesModel'].includes(el.id)) manualFields=null; generate(); });
   });
   $('presetRobust').addEventListener('click',()=>{applyPreset('robust'); generate();});
@@ -501,7 +506,7 @@ function addGeometry(g){
   tr.innerHTML=`<td><input data-g="file" class="wide" value="${esc(g.file)}" title="constant/triSurfaceに置く形状ファイル名。選択済みファイルならZIPへ同梱します。"></td>
   <td><input data-g="name" class="wide" value="${esc(g.name)}" title="snappyHexMesh内のgeometry name。patch名のベースにもなります。"></td>
   <td><select data-g="type" title="snappyHexMeshのgeometry type。STLはtriSurfaceMeshを使います。"><option>triSurfaceMesh</option><option>searchableSurfaceWithGaps</option></select></td>
-  <td><select data-g="patchType" title="refinementSurfacesのpatchInfo typeです。壁ならwall、単なる境界ならpatchを選びます。"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>empty</option></select></td>
+  <td><select data-g="patchType" title="refinementSurfacesのpatchInfo typeです。壁ならwall、単なる境界ならpatchを選びます。"><option>wall</option><option>patch</option><option>symmetryPlane</option><option>symmetry</option><option>empty</option></select></td>
   <td><input data-g="levelMin" class="num" value="${esc(g.levelMin)}" title="この形状の表面refinement最小level"></td>
   <td><input data-g="levelMax" class="num" value="${esc(g.levelMax)}" title="この形状の表面refinement最大level"></td>
   <td><input data-g="featureLevel" class="num" value="${esc(g.featureLevel)}" title="featuresに使う特徴線refinement level。0でfeaturesから除外します。"></td>
@@ -540,7 +545,7 @@ function blockMeshGroupedPatches(){
 function blockMeshPatchPurpose(name,type){
   const n=String(name||'').toLowerCase();
   if(type==='empty') return 'empty';
-  if(type==='symmetryPlane') return 'symmetryPlane';
+  if(type==='symmetryPlane'||type==='symmetry') return type;
   if(type==='wedge') return 'wedge';
   if(type==='wall') return 'wallNoSlip';
   if(n.includes('inlet')) return 'velocityInlet';
@@ -583,7 +588,7 @@ function setBlockMesh2DXY(){
 function resetPatches(){ $('patchTable').querySelector('tbody').replaceChildren(); managedPatchNames.clear(); }
 function addPatch(p){
   const tbody=$('patchTable').querySelector('tbody'); const tr=document.createElement('tr');
-  tr.innerHTML=`<td><input data-k="name" class="wide" value="${esc(p.name)}" title="polyMesh/boundaryに存在するpatch名"></td>
+  tr.innerHTML=`<td><input data-k="name" class="wide" value="${esc(p.name)}" title="polyMesh/boundaryに存在するpatch名"><small data-patch-source style="display:block;white-space:normal"></small></td>
   <td><select data-k="purpose" class="wide" title="patch用途。0ディレクトリ境界条件の自動割当に使います。">${patchPurposes.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select></td>
   <td><input data-k="U" class="wide" value="${esc(p.U)}" title="固定速度、移動壁速度、または流量境界の初期value推算用"></td>
   <td><input data-k="normal" value="${esc(p.normal)}" title="流量境界の初期速度方向。例: (1 0 0)"></td>
@@ -595,7 +600,7 @@ function addPatch(p){
   <td><input data-k="alpha" class="num" value="${esc(p.alpha)}" title="VOF alpha.water。水なら1、空気なら0"></td>
   <td><button class="danger small" data-remove>削除</button></td>`;
   tbody.appendChild(tr); tr.querySelector('[data-k="purpose"]').value=p.purpose;
-  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}if(managedPatchNames.delete(old))managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();}));
+  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;renamePatchReferences(old,el.value);allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}if(managedPatchNames.delete(old))managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();}));
   tr.querySelector('[data-remove]').addEventListener('click',()=>{
     managedPatchNames.delete(tr.dataset.patchName);
     tr.remove();generate();
@@ -611,13 +616,13 @@ function flowVelocity(p){ const A=Math.max(Number(p.area)||1,1e-30); const rho=M
 function turbulenceValues(U){ const I=num('turbI',5)/100, Lt=Math.max(num('turbL',0.01),1e-12), Cmu=0.09, nu=Math.max(num('nu',1e-6),1e-20); const k=1.5*(U*I)**2; const epsilon=Math.pow(Cmu,0.75)*Math.pow(Math.max(k,1e-20),1.5)/Lt; const omega=Math.sqrt(Math.max(k,1e-20))/(Math.pow(Cmu,0.25)*Lt); return {k,epsilon,omega,nut:10*nu,nuTilda:10*nu}; }
 function autoFieldKeys(c){ const keys=['U']; if(c.pMode==='p_rgh') keys.push(c.compressible||c.vof?'p_rghDyn':'p_rgh'); else keys.push(c.compressible?'pDyn':'p'); if(c.heatOn) keys.push('T'); const turb=val('turbulenceType'), ras=val('rasModel'), les=val('lesModel'); if(turb==='RAS'){ if(ras.includes('Spalart')) keys.push('nuTilda','nut'); else if(ras.includes('Epsilon')||ras.includes('KE')||ras==='v2f') keys.push('k','epsilon','nut'); else keys.push('k','omega','nut'); } else if(turb==='LES'){ if(les.includes('Spalart')) keys.push('nuTilda','nut'); else if(les.includes('kOmega')) keys.push('k','omega','nut'); else if(les==='kEqn'||les==='dynamicKEqn') keys.push('k','nut'); else keys.push('nut'); } if(c.heatOn) keys.push(c.compressible?'alphatDyn':'alphat'); if(c.compressible&&c.pMode==='p_rgh') keys.push('pDyn'); if(c.vof) keys.push('alphaWater'); return [...new Set(keys)]; }
 function currentFields(){ return manualFields ? [...manualFields] : autoFieldKeys(cfg()); }
-function generate(){ motionPatchCache=new Map(); syncVisualPatches(); const c=cfg(); $('applicationMirror').value=val('solver'); const files=[]; const root=c.caseName; const fieldKeys=currentFields(); files.push({path:`${root}/README_run.md`, text:readme(c,fieldKeys)}); files.push({path:`${root}/system/controlDict`, text:controlDict(c)}); files.push({path:`${root}/system/fvSchemes`, text:fvSchemes(c,fieldKeys)}); files.push({path:`${root}/system/fvSolution`, text:fvSolution(c,fieldKeys)}); files.push({path:`${root}/system/decomposeParDict`, text:decomposeParDict()}); if(checked('includeBlockMesh')) files.push({path:`${root}/system/blockMeshDict`, text:blockMeshDict()}); if(checked('includeSnappy')){ files.push({path:`${root}/system/snappyHexMeshDict`, text:snappyHexMeshDict()}); files.push({path:`${root}/system/surfaceFeatureExtractDict`, text:surfaceFeatureExtractDict()}); } if(c.vof) files.push({path:`${root}/system/setFieldsDict`, text:setFieldsDict(c)}); files.push({path:`${root}/constant/turbulenceProperties`, text:turbulenceProperties()}); if(c.vof) files.push({path:`${root}/constant/transportProperties`, text:vofTransportProperties()}); else if(c.compressible) files.push({path:`${root}/constant/thermophysicalProperties`, text:thermophysicalProperties()}); else files.push({path:`${root}/constant/transportProperties`, text:transportProperties()}); if(c.heatOn||c.vof||c.pMode==='p_rgh'||c.solver.id.includes('buoyant')) files.push({path:`${root}/constant/g`, text:gFile()}); if(c.mode==='cht') files.push({path:`${root}/constant/regionProperties`, text:regionProperties()}); for(const key of fieldKeys){ const f=clone(allFieldTemplates[key]); if(!f) continue; patchFieldInternal(f,c); files.push({path:`${root}/0/${f.object}`, text:fieldFile(f,c)}); } files.push({path:`${root}/Allrun`, text:allrun(c)}); files.push({path:`${root}/Allclean`, text:allclean()}); files.push(...motionFiles(c),...auxiliaryInputFiles(c)); outputs=files; renderFieldChips(fieldKeys); renderOutputs(); if(workbenchReady) updateWorkbenchStatus(); updateAuxiliaryInputsUI(); }
-function patchFieldInternal(f,c){ if(f.object==='p_rgh'&&c.compressible) f.internal='uniform 101325'; if(f.object==='T') f.internal=`uniform ${fmt(num('TRef',293.15))}`; if(f.object==='k') f.internal=`uniform ${fmt(c.turb.k)}`; if(f.object==='epsilon') f.internal=`uniform ${fmt(c.turb.epsilon)}`; if(f.object==='omega') f.internal=`uniform ${fmt(c.turb.omega)}`; if(f.object==='nut') f.internal=`uniform ${fmt(c.turb.nut)}`; if(f.object==='nuTilda') f.internal=`uniform ${fmt(c.turb.nuTilda)}`; }
+function generate(){ motionPatchCache=new Map(); syncVisualPatches(); const c=cfg(); $('applicationMirror').value=val('solver'); const files=[]; const root=c.caseName; const fieldKeys=currentFields(); files.push({path:`${root}/README_run.md`, text:readme(c,fieldKeys)}); files.push({path:`${root}/system/controlDict`, text:controlDict(c)}); files.push({path:`${root}/system/fvSchemes`, text:fvSchemes(c,fieldKeys)}); files.push({path:`${root}/system/fvSolution`, text:fvSolution(c,fieldKeys)}); files.push({path:`${root}/system/decomposeParDict`, text:decomposeParDict()}); if(checked('includeBlockMesh')) files.push({path:`${root}/system/blockMeshDict`, text:blockMeshDict()}); if(checked('includeSnappy')){ files.push({path:`${root}/system/snappyHexMeshDict`, text:snappyHexMeshDict()}); files.push({path:`${root}/system/surfaceFeatureExtractDict`, text:surfaceFeatureExtractDict()}); } if(c.vof) files.push({path:`${root}/system/setFieldsDict`, text:setFieldsDict(c)}); files.push({path:`${root}/constant/turbulenceProperties`, text:turbulenceProperties()}); if(c.vof) files.push({path:`${root}/constant/transportProperties`, text:vofTransportProperties()}); else if(c.compressible) files.push({path:`${root}/constant/thermophysicalProperties`, text:thermophysicalProperties()}); else files.push({path:`${root}/constant/transportProperties`, text:transportProperties()}); if(c.heatOn||c.vof||c.pMode==='p_rgh'||c.solver.id.includes('buoyant')) files.push({path:`${root}/constant/g`, text:gFile()}); if(c.mode==='cht') files.push({path:`${root}/constant/regionProperties`, text:regionProperties()}); for(const key of fieldKeys){ const f=clone(allFieldTemplates[key]); if(!f) continue; patchFieldInternal(f,c); files.push({path:`${root}/0/${f.object}`, text:fieldFile(f,c)}); } files.push({path:`${root}/Allrun`, text:allrun(c)}); files.push({path:`${root}/Allclean`, text:allclean()}); files.push(...motionFiles(c),...auxiliaryInputFiles(c),...runtimeCheckFiles(c,fieldKeys)); outputs=files; renderFieldChips(fieldKeys); renderOutputs(); if(workbenchReady) updateWorkbenchStatus(); updateAuxiliaryInputsUI(); updateCaseChecksUI(); }
+function patchFieldInternal(f,c){ if(f.object==='U')f.internal='uniform '+val('initialU'); if(f.object==='p_rgh'&&c.compressible) f.internal='uniform 101325'; if(f.object==='T') f.internal=`uniform ${fmt(num('TRef',293.15))}`; if(f.object==='k') f.internal=`uniform ${fmt(c.turb.k)}`; if(f.object==='epsilon') f.internal=`uniform ${fmt(c.turb.epsilon)}`; if(f.object==='omega') f.internal=`uniform ${fmt(c.turb.omega)}`; if(f.object==='nut') f.internal=`uniform ${fmt(c.turb.nut)}`; if(f.object==='nuTilda') f.internal=`uniform ${fmt(c.turb.nuTilda)}`; }
 function renderFieldChips(keys){ $('fieldChips').innerHTML=keys.map(k=>`<span class="chip"><b>${esc(allFieldTemplates[k]?.object||k)}</b><span>${esc(allFieldTemplates[k]?.desc||'')}</span><button class="small" data-rm-field="${k}">×</button></span>`).join(''); $('fieldChips').querySelectorAll('[data-rm-field]').forEach(btn=>btn.addEventListener('click',()=>{manualFields=currentFields().filter(k=>k!==btn.dataset.rmField); generate();})); }
 function renderOutputs(){ $('patchEmptyStatus').hidden=!!$('patchTable').querySelector('tbody tr');const errors=blockingErrors(); const msgs=[...errors.map(x=>'エラー: '+x),...validate()]; $('downloadZip').disabled=errors.length>0||importBusy; $('downloadSelected').disabled=errors.length>0; $('copyAll').disabled=errors.length>0; $('validationBox').className='note '+(errors.length?'danger':msgs.some(m=>m.startsWith('注意')||m.startsWith('要確認'))?'warn':'ok'); $('validationBox').innerHTML=msgs.map(esc).join('<br>'); $('pathList').textContent=[...outputs.map(o=>o.path), ...[...selectedGeometryFiles.keys()].map(f=>geometryZipPath(cfg().caseName,f)+'  [binary geometry]')].join('\n'); const prev=selectedPath; $('previewSelect').innerHTML=outputs.map(o=>`<option value="${esc(o.path)}">${esc(o.path)}</option>`).join(''); selectedPath=outputs.find(o=>o.path===prev)?.path||outputs[0]?.path||''; $('previewSelect').value=selectedPath; renderPreview(); }
 function renderPreview(){ $('previewText').value=outputs.find(o=>o.path===selectedPath)?.text||''; }
 function validate(){
-  const c=cfg(), msgs=[];
+  const c=cfg(), msgs=caseInputWarnings(c);
   const names=c.patches.map(p=>p.name); const dup=names.filter((x,i,a)=>a.indexOf(x)!==i);
   if(dup.length) msgs.push('要確認: patch名が重複しています: '+[...new Set(dup)].join(', '));
   if(c.vof&&num('maxAlphaCo',1)>0.3) msgs.push('注意: VOFではmaxAlphaCoを0.1〜0.3程度から始めると安定しやすいです。');
@@ -678,6 +683,7 @@ function bcForField(f,p,c){ const cons=constraint(p); if(cons) return cons; cons
     if(pur==='wallNoSlip'||pur==='roughWall'||pur==='movingWall') return zeroGradient();
     return zeroGradient();
   }
+  if(['k','epsilon','omega','nuTilda','T'].includes(o)&&['pressureOutlet','inletOutlet','atmosphere'].includes(pur))return `type inletOutlet;\ninletValue ${f.internal};\nvalue ${f.internal};`;
   if(o==='k'){ if(pur.includes('wall')||pur.includes('Wall')) return `type            kqRWallFunction;\nvalue           ${f.internal};`; if(pur.includes('Inlet')) return `type            fixedValue;\nvalue           ${f.internal};`; return zeroGradient(); }
   if(o==='epsilon'){ if(pur.includes('wall')||pur.includes('Wall')) return `type            epsilonWallFunction;\nvalue           ${f.internal};`; if(pur.includes('Inlet')) return `type            fixedValue;\nvalue           ${f.internal};`; return zeroGradient(); }
   if(o==='omega'){ if(pur.includes('wall')||pur.includes('Wall')) return `type            omegaWallFunction;\nvalue           ${f.internal};`; if(pur.includes('Inlet')) return `type            fixedValue;\nvalue           ${f.internal};`; return zeroGradient(); }
@@ -708,10 +714,6 @@ runTimeModifiable ${val('runTimeModifiable')};
 adjustTimeStep  ${val('adjustTimeStep')};
 maxCo           ${val('maxCo')};
 ${c.vof?`maxAlphaCo      ${val('maxAlphaCo')};\n`:''}${maxDelta}
-InfoSwitches
-{
-    level        ${val('infoLevel')};
-}
 
 functions
 {
@@ -723,7 +725,7 @@ ${functionObjects(c)}
 function listWords(s){ return String(s||'').trim().split(/[\s,]+/).filter(Boolean); }
 function vecFromDirString(name,fb){ const m=val('foCoeffDirs').match(new RegExp(name+'\\s*=\\s*(\\([^;]+\\))')); return m?m[1]:fb; }
 function functionObjects(c){ const out=[]; const wc=val('foBasicWriteControl'), wi=val('foBasicWriteInterval');
-  if(checked('foResiduals')) out.push(`    residuals1\n    {\n        type            residuals;\n        libs            (utilityFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n        fields          (${listWords(val('foResidualFields')).join(' ')});\n    }`);
+  if(checked('foResiduals')) out.push(`    solverInfo1\n    {\n        type            solverInfo;\n        libs            (utilityFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n        fields          (${residualFieldNames(c).join(' ')});\n    }`);
   if(checked('foCourant')) out.push(`    CourantNo1\n    {\n        type            CourantNo;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n    }`);
   if(checked('foYPlus')&&c.solver.id!=='icoFoam') out.push(`    yPlus1\n    {\n        type            yPlus;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n    }`);
   if(checked('foWallShear')&&c.solver.id!=='icoFoam') out.push(`    wallShearStress1\n    {\n        type            wallShearStress;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n    }`);
@@ -735,11 +737,11 @@ function functionObjects(c){ const out=[]; const wc=val('foBasicWriteControl'), 
   if(checked('foFieldAverage')){ const fields=listWords(val('foAverageFields')).map(f=>`            ${f}\n            {\n                mean        on;\n                prime2Mean  ${val('foPrime2Mean')};\n                base        ${val('foAverageBase')};\n            }`).join('\n'); out.push(`    fieldAverage1\n    {\n        type            fieldAverage;\n        libs            (fieldFunctionObjects);\n        writeControl    writeTime;\n        fields\n        (\n${fields}\n        );\n    }`); }
   if(checked('foProbes')) out.push(`    probes1\n    {\n        type            probes;\n        libs            (sampling);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n        fields          (${listWords(val('foProbeFields')).join(' ')});\n        probeLocations\n        (\n${val('foProbeLocations').split('\n').filter(Boolean).map(x=>'            '+x.trim()).join('\n')}\n        );\n    }`);
   if(checked('foSurfaces')) out.push(`    surfaces1\n    {\n        type            surfaces;\n        libs            (sampling);\n        writeControl    writeTime;\n        surfaceFormat   ${val('foSurfaceFormat')};\n        interpolationScheme cellPoint;\n        fields          (${listWords(val('foSurfaceFields')).join(' ')});\n        surfaces\n        (\n            plane1\n            {\n                type        cuttingPlane;\n                planeType   pointAndNormal;\n                pointAndNormalDict\n                {\n                    point   ${val('foPlanePoint')};\n                    normal  ${val('foPlaneNormal')};\n                }\n                interpolate true;\n            }\n        );\n    }`);
-  if(checked('foSurfaceFieldValue')) out.push(`    patchFlux_${val('foSFVPatch')}\n    {\n        type            surfaceFieldValue;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${val('foSFVInterval')};\n        regionType      patch;\n        name            ${val('foSFVPatch')};\n        operation       ${val('foSFVOperation')};\n        fields          (${val('foSFVField')});\n        writeFields     false;\n    }`);
+  out.push('    #include "flowMonitors"');
   if(checked('foVolFieldValue')) out.push(`    volFieldValue1\n    {\n        type            volFieldValue;\n        libs            (fieldFunctionObjects);\n        writeControl    ${wc};\n        writeInterval   ${wi};\n        regionType      ${val('foVFVRegion')};\n${val('foVFVRegion')==='cellZone'?'        name            '+val('foVFVName')+';\n':''}        operation       ${val('foVFVOperation')};\n        fields          (${listWords(val('foVFVFields')).join(' ')});\n        writeFields     false;\n    }`);
   return out.join('\n\n'); }
 function fvSchemes(c,fields){ const ddt=val('timeMode')==='steady'?'steadyState':val('ddtScheme'), scalar=val('divScalarScheme'), Udiv=val('divUScheme'), lap=val('laplacianScheme'), sn=val('snGradScheme'); const has=o=>fields.some(k=>allFieldTemplates[k]?.object===o); const divs=[`    div(phi,U)      ${Udiv};`]; ['k','epsilon','omega','nuTilda','T','alphat'].forEach(s=>{ if(has(s)) divs.push(`    div(phi,${s})     ${scalar};`); }); if(c.compressible) divs.push(`    div(phi,h) ${scalar};`,`    div(phi,e) ${scalar};`,`    div(phi,K) ${scalar};`,`    div(phi,Ekp) ${scalar};`,'    div(phiv,p) Gauss upwind;'); if(c.vof){ divs.push('    div(phi,alpha)  Gauss vanLeer;','    div(phirb,alpha) Gauss interfaceCompression;','    div(rhoPhi,U)   bounded Gauss limitedLinearV 1;'); } divs.push('    div((nuEff*dev2(T(grad(U))))) Gauss linear;','    div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear;'); return header('dictionary','fvSchemes','system')+`ddtSchemes\n{\n    default         ${ddt};\n}\n\ngradSchemes\n{\n    default         Gauss linear;\n    grad(U)         cellLimited Gauss linear 1;\n}\n\ndivSchemes\n{\n    default         none;\n${divs.join('\n')}\n}\n\nlaplacianSchemes\n{\n    default         ${lap};\n}\n\ninterpolationSchemes\n{\n    default         linear;\n}\n\nsnGradSchemes\n{\n    default         ${sn};\n}\n\nwallDist\n{\n    method          meshWave;\n}\n\nfluxRequired\n{\n    default         no;\n    p;\n    p_rgh;\n}\n\n// ************************************************************************* //\n`; }
-function fvSolution(c,fields){ const pressure=c.pMode==='p_rgh'?'p_rgh':'p', steady=val('timeMode')==='steady'; const alphaBlock=c.vof?`\n    "alpha.*"\n    {\n        solver          smoothSolver;\n        smoother        symGaussSeidel;\n        tolerance       1e-8;\n        relTol          0;\n        nAlphaCorr      1;\n        nAlphaSubCycles 2;\n        cAlpha          1;\n        MULESCorr      yes;\n        nLimiterIter   3;\n        ${c.solver.id==='interIsoFoam'?'isoFaceTol 1e-8;\n        surfCellTol 1e-8;\n        nAlphaBounds 3;\n        snapTol 1e-12;\n        reconstructionScheme isoAlpha;\n        clip true;':''}\n    }\n`:''; const algo=steady?`SIMPLE\n{\n    nNonOrthogonalCorrectors ${val('nNonOrth')};\n    consistent       yes;\n    pRefCell 0;\n    pRefValue 0;\n    residualControl\n    {\n        p             1e-4;\n        U             1e-5;\n        "(k|epsilon|omega|nuTilda|T)" 1e-5;\n    }\n}\n\nrelaxationFactors\n{\n    fields { p 0.3; p_rgh 0.3; }\n    equations { U 0.7; "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)" 0.7; }\n}\n`:`${c.solver.id==='icoFoam'?'PISO':'PIMPLE'}\n{\n    momentumPredictor yes;\n    nOuterCorrectors ${val('nOuter')};\n    correctPhi yes;\n    checkMeshCourantNo yes;\n    nCorrectors     ${val('nCorrectors')};\n    nNonOrthogonalCorrectors ${val('nNonOrth')};\n    pRefCell        0;\n    pRefValue       0;\n    residualControl\n    {\n        ${pressure}   1e-4;\n        U             1e-5;\n    }\n}\n`; return header('dictionary','fvSolution','system')+`solvers\n{\n    ${pressure}\n    {\n        solver          GAMG;\n        tolerance       ${val('pTol')};\n        relTol          ${val('pRelTol')};\n        smoother        GaussSeidel;\n        cacheAgglomeration true;\n        agglomerator    faceAreaPair;\n        nCellsInCoarsestLevel 20;\n        mergeLevels     1;\n    }\n\n    ${pressure}Final\n    {\n        \$${pressure};\n        relTol          0;\n    }\n\n    U\n    {\n        solver          smoothSolver;\n        smoother        symGaussSeidel;\n        tolerance       ${val('fieldTol')};\n        relTol          0.1;\n    }\n\n    UFinal\n    {\n        \$U;\n        relTol          0;\n    }\n\n    "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)"\n    {\n        \$U;\n    }\n\n    "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)Final"\n    {\n        \$U;\n        relTol          0;\n    }\n    pcorr\n    {\n        $${pressure};\n        relTol 0;\n    }\n    pcorrFinal { $pcorr; }\n${alphaBlock}}\n\n${algo}// ************************************************************************* //\n`; }
+function fvSolution(c,fields){ const pressure=c.pMode==='p_rgh'?'p_rgh':'p', steady=c.solver.time==='steady'; const alphaBlock=c.vof?`\n    "alpha.*"\n    {\n        solver          smoothSolver;\n        smoother        symGaussSeidel;\n        tolerance       1e-8;\n        relTol          0;\n        nAlphaCorr      1;\n        nAlphaSubCycles 2;\n        cAlpha          1;\n        MULESCorr      yes;\n        nLimiterIter   3;\n        ${c.solver.id==='interIsoFoam'?'isoFaceTol 1e-8;\n        surfCellTol 1e-8;\n        nAlphaBounds 3;\n        snapTol 1e-12;\n        reconstructionScheme isoAlpha;\n        clip true;':''}\n    }\n`:''; const algo=steady?`SIMPLE\n{\n    nNonOrthogonalCorrectors ${val('nNonOrth')};\n    consistent       yes;\n    pRefCell 0;\n    pRefValue 0;\n    residualControl\n    {\n        ${pressure}   1e-4;\n        U             1e-5;\n        "(k|epsilon|omega|nuTilda|T)" 1e-5;\n    }\n}\n\nrelaxationFactors\n{\n    fields { p 0.3; p_rgh 0.3; }\n    equations { U 0.7; "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)" 0.7; }\n}\n`:`${c.solver.id==='icoFoam'?'PISO':'PIMPLE'}\n{\n    momentumPredictor yes;\n    nOuterCorrectors ${val('nOuter')};\n    correctPhi yes;\n    checkMeshCourantNo yes;\n    nCorrectors     ${val('nCorrectors')};\n    nNonOrthogonalCorrectors ${val('nNonOrth')};\n    pRefCell        0;\n    pRefValue       0;\n    ${c.solver.id==='icoFoam'?'':'residualControl\n    {\n        '+pressure+' { tolerance 1e-4; relTol 0; }\n        U { tolerance 1e-5; relTol 0; }\n    }'}\n}\n`; return header('dictionary','fvSolution','system')+`solvers\n{\n    ${pressure}\n    {\n        solver          GAMG;\n        tolerance       ${val('pTol')};\n        relTol          ${val('pRelTol')};\n        smoother        GaussSeidel;\n        cacheAgglomeration true;\n        agglomerator    faceAreaPair;\n        nCellsInCoarsestLevel 20;\n        mergeLevels     1;\n    }\n\n    ${pressure}Final\n    {\n        \$${pressure};\n        relTol          0;\n    }\n\n    U\n    {\n        solver          smoothSolver;\n        smoother        symGaussSeidel;\n        tolerance       ${val('fieldTol')};\n        relTol          0.1;\n    }\n\n    UFinal\n    {\n        \$U;\n        relTol          0;\n    }\n\n    "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)"\n    {\n        \$U;\n    }\n\n    "(k|epsilon|omega|nuTilda|T|alphat|h|e|rho)Final"\n    {\n        \$U;\n        relTol          0;\n    }\n    pcorr\n    {\n        $${pressure};\n        relTol 0;\n    }\n    pcorrFinal { $pcorr; }\n${alphaBlock}}\n\n${algo}// ************************************************************************* //\n`; }
 function turbulenceProperties(){ const t=val('turbulenceType'); let body=`simulationType  ${t};\n`; if(t==='RAS') body+=`\nRAS\n{\n    RASModel        ${val('rasModel')};\n    turbulence      on;\n    printCoeffs     on;\n}\n`; if(t==='LES') body+=`\nLES\n{\n    LESModel        ${val('lesModel')};\n    turbulence      on;\n    printCoeffs     on;\n    delta           cubeRootVol;\n}\n`; return header('dictionary','turbulenceProperties','constant')+body+'\n// ************************************************************************* //\n'; }
 function transportProperties(){ return header('dictionary','transportProperties','constant')+`transportModel  Newtonian;\n\nnu              [0 2 -1 0 0 0 0] ${fmt(num('nu',1e-6))};\nrho             [1 -3 0 0 0 0 0] ${fmt(num('rho',1000))};\nbeta            [0 0 0 -1 0 0 0] ${fmt(num('beta',0.0034))};\nTRef            [0 0 0 1 0 0 0] ${fmt(num('TRef',293.15))};\nPr              [0 0 0 0 0 0 0] ${fmt(num('Pr',0.71))};\nPrt             [0 0 0 0 0 0 0] ${fmt(num('Prt',0.85))};\n\n// ************************************************************************* //\n`; }
 function vofTransportProperties(){ const m1=materials[val('material')]||materials.water20, m2=materials[val('material2')]||materials.air20; const ph1='water',ph2='air'; return header('dictionary','transportProperties','constant')+`phases          (${ph1} ${ph2});\n\n${ph1}\n{\n    transportModel  Newtonian;\n    nu              [0 2 -1 0 0 0 0] ${fmt(num('nu',1e-6))};\n    rho             [1 -3 0 0 0 0 0] ${fmt(num('rho',1000))};\n}\n\n${ph2}\n{\n    transportModel  Newtonian;\n    nu              [0 2 -1 0 0 0 0] ${fmt(m2.nu||1.5e-5)};\n    rho             [1 -3 0 0 0 0 0] ${fmt(m2.rho||1.2)};\n}\n\nsigma           [1 0 -2 0 0 0 0] ${fmt(num('sigma',0.072))};\n\n// ************************************************************************* //\n`; }
@@ -826,7 +828,7 @@ castellatedMeshControls
     maxGlobalCells 2000000;
     minRefinementCells 0;
     maxLoadUnbalance 0.10;
-    nCellsBetweenLevels 3;
+    nCellsBetweenLevels ${val('nCellsBetweenLevels')};
 
     features
     (
@@ -847,8 +849,8 @@ ${surfaceEntries || '        // No refinement surfaces'}
 snapControls
 {
     nSmoothPatch 3;
-    tolerance 2.0;
-    nSolveIter 30;
+    tolerance ${val('snapTolerance')};
+    nSolveIter ${val('snapSolveIter')};
     nRelaxIter 5;
     nFeatureSnapIter 10;
     implicitFeatureSnap false;
@@ -858,15 +860,15 @@ snapControls
 
 addLayersControls
 {
-    relativeSizes true;
+    relativeSizes ${val('layerRelativeSizes')};
     layers
     {
 ${layerEntries || '        // layers disabled for all geometry rows'}
         // Named STL regions are mapped to the boundary-condition table.
     }
-    expansionRatio 1.2;
+    expansionRatio ${val('layerExpansionRatio')};
     finalLayerThickness ${val('finalLayerThickness')};
-    minThickness 0.05;
+    minThickness ${val('layerMinThickness')};
     nGrow 0;
     featureAngle 60;
     nRelaxIter 5;
@@ -884,7 +886,6 @@ meshQualityControls
 {
     #includeEtc "caseDicts/mesh/generation/meshQualityDict.cfg"
     // v2412: cfg includes nSmoothScale and errorReduction required during snap.
-    relaxed { maxNonOrtho 75; }
 }
 
 writeFlags (scalarLevels layerSets layerFields);
@@ -929,12 +930,15 @@ function crc32(bytes){ let c=0xffffffff; for(const b of bytes) c=crcTable[(c^b)&
 function dosDateTime(d=new Date()){ const time=((d.getHours()&31)<<11)|((d.getMinutes()&63)<<5)|((Math.floor(d.getSeconds()/2))&31); const date=(((d.getFullYear()-1980)&127)<<9)|(((d.getMonth()+1)&15)<<5)|(d.getDate()&31); return {time,date}; }
 function u16(a,n){ a.push(n&255,(n>>>8)&255); } function u32(a,n){ a.push(n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255); } function bytesOf(s){ return new TextEncoder().encode(s); } function append(a,b){ for(const x of b) a.push(x); }
 function makeZip(files){ const out=[],central=[]; let offset=0; const dt=dosDateTime(); for(const f of files){ const name=bytesOf(f.name.replace(/^\/+/,'')), data=(f.bytes instanceof Uint8Array ? f.bytes : bytesOf(f.text||'')), crc=crc32(data), local=[]; u32(local,0x04034b50); u16(local,20); u16(local,0x0800); u16(local,0); u16(local,dt.time); u16(local,dt.date); u32(local,crc); u32(local,data.length); u32(local,data.length); u16(local,name.length); u16(local,0); append(local,name); append(local,data); append(out,local); const c=[]; u32(c,0x02014b50); u16(c,20); u16(c,20); u16(c,0x0800); u16(c,0); u16(c,dt.time); u16(c,dt.date); u32(c,crc); u32(c,data.length); u32(c,data.length); u16(c,name.length); u16(c,0); u16(c,0); u16(c,0); u16(c,0); u32(c,0); u32(c,offset); append(c,name); append(central,c); offset+=local.length; } const cdOffset=offset, cdSize=central.length; append(out,central); const e=[]; u32(e,0x06054b50); u16(e,0); u16(e,0); u16(e,files.length); u16(e,files.length); u32(e,cdSize); u32(e,cdOffset); u16(e,0); append(out,e); return new Blob([new Uint8Array(out)],{type:'application/zip'}); }
+const runtimeCheckScript = /* BUILD:runtime-check */;
+/* BUILD:case-validation */
 /* BUILD:workbench */
 /* BUILD:waveform-ui */
 /* BUILD:inputs-ui */
 init();
 initWorkbench();
 initInputsUI();
+initCaseChecksUI();
 })();
 </script>
 </body>
