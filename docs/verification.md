@@ -2,6 +2,8 @@
 
 現在の配布方針: mainには最新版のHTMLだけを置く。以下の旧版HTMLの保持・重複生成に関する記述は当時の履歴であり、現在はビルド・テスト・CIを最新版1ファイルへ統一している。旧版はGit履歴から取得できる。
 
+**最新の実行確認（2026-09-06）:** ユーザーのOpenCFD v2412 patch=260127環境で、小規模6ケースの通常実行と残差・流量監視が正常終了した。[対象SHA・ケース別結果・元ケースの残作業](verification-v2412-2026-09-06.md)を参照。以下の各版の「未実施」はその記録時点・作業環境での状況であり、この新しい確認結果と区別する。
+
 対象: OpenCFD版 OpenFOAM-v2412 tag。2026-09-05に公式GitLab APIからソースを取得して確認。Foundation版へ読み替えないこと。
 
 | 対象 | 公式ソース | 反映内容 |
@@ -16,7 +18,7 @@
 | スクリプト | [RunFunctions](https://gitlab.com/openfoam/core/openfoam/-/blob/OpenFOAM-v2412/bin/tools/RunFunctions) | runParallelの-npは実行名より前。未初期化localがあるためset -uは使用せずset -e |
 | createPatch場読込 | [createPatch.C](https://gitlab.com/openfoam/core/openfoam/-/blob/OpenFOAM-v2412/applications/utilities/mesh/manipulation/createPatch/createPatch.C) | patchFieldsを指定しない辞書では既存0/場を読み込まない |
 
-## 実施済み
+## 初版作成時の実施済み事項
 
 - 8ソルバーの必須場・解法、圧力次元、VOF物性・相名・初期箱。
 - LES/DESのモデル別場と必須場の削除時の出力抑止。
@@ -25,7 +27,7 @@
 - AMI/MRF/剛体回転/適合細分化の設定、回転軸・円筒の入力検査、壁速度の追従。
 - JSON作業復元、ZIPの独立した読込とCRC検証。
 
-## 未実施
+## 初版作成時の未実施事項
 
 - Chrome/EdgeのWebGL描画・ピッキングの目視確認。本作業環境ではブラウザのURL制限により実施できなかった。
 - v2412でのfoamDictionary / blockMesh / snappyHexMesh / createPatch / topoSet / ソルバー実行。
@@ -155,3 +157,11 @@ OpenFOAMの実行と実ブラウザでの描画目視は引き続き未実施。
 - 出口の不存在/0面、背景側だけの圧力、残差の不正形式、初期場欠落、制約境界の型不一致、古い成功ログ、終了コード0の不合格、異常終了、検査中のメッシュ変化、手動監視名/場の不整合を検査した。sh Allrunでディレクトリ移動に失敗する既存不具合も修正した。
 - 実v2412用の小ケース6種類（PIMPLE外部反復1/3、SIMPLE、PISO、VOF、STLチャネル）をHTMLから生成できることを確認した。通常起動と監視ファイル/符号付き和を検査する実行スクリプトも追加したが、この環境にはv2412本体がなく未実行。
 - 元ケースと元STLがないため、報告された凹セルの原因、対称境界の意図、単位の意図、実ケースの起動/監視、長時間安定性は未検証。実ブラウザの描画目視も未実施。詳細は[v2412実行時修正](v2412-runtime-fixes.md)を参照。
+
+### 2026-09-06: ユーザー環境でのv2412受入結果
+
+- 確認対象はmainコミット`0013305a6795226093732d1b27ec68ca13f43075`、`OpenFOAM_v2412_case_builder_v8_4.html`のGit blob SHAは`43a176fadcf70d429b6a53892d1ec8761740c8ad`。ユーザー提供の報告を記録し、作者側の実行結果と混同しない。
+- OpenCFD v2412 patch=260127で、`pimple-one`、`pimple-three`、`simple`、`piso`、`vof`、`stl-channel`が通常終了。solverInfoの数値記録、入口/出口の流量符号、監視時刻、個別流量と合計の一致を確認したとの報告を受領した。
+- `runtime-generation.test.cjs`は成功、`test_runtime_check.py`は21テスト成功。後者はコマンドを模擬した制御・検査テストであり、上記6ケースの実OpenFOAM実行とは別。以前の作者側Nodeテスト131件成功を、今回ユーザーが全テストを再実行したという意味には扱わない。
+- ユーザーは一時ディレクトリで配布HTMLを検証し、元HTML・元ケースは未変更。元ケースの実出口・対称条件・スケール確認、凹セル5092個・凹面482個の改善、一式再出力と通常実行は残る。
+- 今回の確認は並列・長時間・層追加・全物理モデルを網羅しない。修正前の`ChatGPT_Work_修正依頼.txt`は過去の不具合記録として参照し、今後の状況連絡には[今回の実行確認記録](verification-v2412-2026-09-06.md)を併記する。
