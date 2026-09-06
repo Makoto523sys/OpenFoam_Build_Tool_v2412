@@ -3,8 +3,13 @@
   <div class="workspace-grid">
     <div>
       <div id="stlPickerSlot"></div>
-      <div class="btns"><button id="demoGeometry" class="light">内部ノズルの例を表示</button><button id="fitGeometry" class="ghost">全体表示</button><button id="viewX" class="ghost">Xから</button><button id="viewY" class="ghost">Yから</button><button id="viewZ" class="ghost">Zから</button><button id="viewIso" class="ghost">斜め</button></div>
-      <div class="viewport"><canvas id="stlCanvas" aria-label="STL 3Dビュー：クリックで面選択、ドラッグで回転、右ドラッグで移動、ホイールで拡大。キーボード：矢印で回転、+/-で拡大縮小、Homeで全体表示" tabindex="0"></canvas><svg id="viewAxes" viewBox="0 0 90 90" aria-label="座標軸"></svg><div class="view-help">クリック：選択 / Ctrl・Shift：追加選択 / ドラッグ：回転 / 右ドラッグ：移動 / ホイール：拡大</div></div>
+      <div class="btns"><button id="demoGeometry" class="light">内部ノズルの例を表示</button><button id="viewX" class="ghost">Xから</button><button id="viewY" class="ghost">Yから</button><button id="viewZ" class="ghost">Zから</button><button id="viewIso" class="ghost">斜め</button></div>
+      <div class="viewport"><canvas id="stlCanvas" aria-label="STLと保持点の3Dビュー：クリックで面選択、ドラッグで回転、右ドラッグで移動、ホイールで拡大。キーボード：矢印で回転、+/-で拡大縮小、HomeでSTLと点を全体表示" tabindex="0"></canvas><svg id="viewAxes" viewBox="0 0 90 90" aria-label="座標軸"></svg><div id="fluidPointLegend" hidden><span aria-hidden="true"></span>locationInMesh</div><div class="view-help">クリック：選択 / Ctrl・Shift：追加選択 / ドラッグ：回転 / 右ドラッグ：移動 / ホイール：拡大</div></div>
+      <div id="fluidPointControls" class="fluid-point-controls">
+        <div class="fluid-point-row"><div><label for="locationInMesh">流体として残す領域の保持点 locationInMesh [m]</label><input id="locationInMesh" value="(0 0 0)" placeholder="(x y z)" spellcheck="false" aria-describedby="fluidPointHelp fluidPointStatus"></div><button id="fitGeometry" class="ghost">STLと点を全体表示</button></div>
+        <p id="fluidPointStatus" class="hint" role="status" aria-live="polite"></p>
+        <p id="fluidPointHelp" class="hint">座標は (x y z) をメートルで入力します。ピンクの点は1つだけ表示し、編集すると移動します。輪郭だけの点はSTLに隠れた位置、中央も塗られた点は見えている位置です。X・Y・Zからの表示や面の非表示で位置を確認してください。保持点は流体領域内に置き、STL表面上を避けてください。内外の自動判定は行いません。</p>
+      </div>
       <div class="btns"><button id="hideSelection" class="secondary">選択面を非表示</button><button id="isolateSelection" class="secondary">選択面だけ表示</button><button id="showAllFaces" class="ghost">すべて再表示</button><button id="clearSelection" class="ghost">選択解除</button><button id="undoGeometry" class="ghost">面操作を戻す</button></div>
       <p class="hint">非表示の面も計算用STLに残ります。面を隠して内部の部品を選択できます。STLの面方向と閉鎖性は出力前に確認してください。</p>
       <div id="geometryStatus" role="status" aria-live="polite" class="note">ASCII / binary STLを読み込むとここに表示します。データはブラウザ内で処理します。</div>

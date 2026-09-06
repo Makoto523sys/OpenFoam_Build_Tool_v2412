@@ -5,10 +5,10 @@ const {app}=require('./helpers.cjs');
 function visible(a,id){let el=a.d.getElementById(id);assert.ok(el,id+' exists');while(el){assert.equal(el.hidden,false,id+' has no hidden ancestor');assert.notEqual(a.w.getComputedStyle(el).display,'none',id+' is displayed');el=el.parentElement;}}
 async function chooseFile(a,id,file){const el=a.d.getElementById(id);Object.defineProperty(el,'files',{configurable:true,value:[file]});el.dispatchEvent(new a.w.Event('change',{bubbles:true}));await new Promise(setImmediate);}
 test('both upload inputs are visible on initial load and linked directly from the page header',()=>{const a=app();try{
-  assert.match(a.d.title,/v8\.2$/);assert.equal(a.d.getElementById('enableAcceleration').checked,false);assert.equal(a.d.getElementById('waterRegionMode').value,'box');
+  assert.match(a.d.title,/v8\.3$/);assert.equal(a.d.getElementById('enableAcceleration').checked,false);assert.equal(a.d.getElementById('waterRegionMode').value,'box');
   visible(a,'accelerationPicker');visible(a,'waterRegionPicker');
   for(const id of ['initialWaterPanel','accelerationPanel'])assert.ok(a.d.querySelector('nav a[href="#'+id+'"]'));
-  assert.equal(fs.readFileSync(require.resolve('../OpenFOAM_v2412_case_builder_v8_2.html'),'utf8'),fs.readFileSync(require.resolve('../OpenFOAM_v2412_case_builder_v3.html'),'utf8'));
+  assert.equal(fs.readFileSync(require.resolve('../OpenFOAM_v2412_case_builder_v8_3.html'),'utf8'),fs.readFileSync(require.resolve('../OpenFOAM_v2412_case_builder_v3.html'),'utf8'));
 }finally{a.close();}});
 test('choosing CSV in the visible file input enables acceleration and produces its source',async()=>{const a=app();try{
   a.set('includeSnappy',false);a.set('solver','interFoam');a.set('adjustTimeStep','no');
