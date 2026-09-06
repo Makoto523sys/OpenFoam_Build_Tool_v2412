@@ -1,10 +1,10 @@
 # OpenFOAM v2412 Case Builder v8.3
 
-STLを見ながらパッチと境界条件を設定する、オフラインのケース生成ツールです。対象は **OpenCFD版 OpenFOAM v2412**。従来名のHTMLも同じ内容で同梱しています。
+STLを見ながらパッチと境界条件を設定する、オフラインのケース生成ツールです。対象は **OpenCFD版 OpenFOAM v2412**。配布用HTMLは最新版1つに統一しています。
 
 **[OpenFOAM_v2412_case_builder_v8_3.html](OpenFOAM_v2412_case_builder_v8_3.html)** をダウンロードし、Chrome / Edge / Firefoxで開いてください。npm、サーバー、外部CDNは実行時に不要です。STLや作業データを外部へ送信しません。
 
-画面上部に **Case Builder v8.3** と表示されることを確認してください。上部の「初期水領域STL」「加速度CSV・波形生成」リンクから専用の読み込み欄へ移動できます。どちらのファイル選択欄も最初から表示されます。承認済みの[旧版v8.2](OpenFOAM_v2412_case_builder_v8_2.html)と[旧版v8.1](OpenFOAM_v2412_case_builder_v8_1.html)も残しています。
+画面上部に **Case Builder v8.3** と表示されることを確認してください。上部の「初期水領域STL」「加速度CSV・波形生成」リンクから専用の読み込み欄へ移動できます。どちらのファイル選択欄も最初から表示されます。旧版は[Gitの履歴](https://github.com/Makoto523sys/OpenFoam_Build_Tool_v2412/commits/main/)から取得できます。
 
 ## 基本操作
 
@@ -167,7 +167,7 @@ npm test
 ```
 
 - 編集対象: src/template.html（既存GUI・辞書）、src/workbench.html / workbench.js（面操作・検査・運動）、geometry.js（STL）、viewer.js（WebGL）、acceleration.js / water-region.js（専用入力の検証・変換）、inputs-ui.js（専用UI・出力・作業保存の統合）、waveform.js / waveform-ui.js（数式評価・軸別波形生成）。
-- npm run buildで配布用HTMLへインライン化。従来名と版番号付きの生成済みHTMLを両方コミットしてください。
+- npm run buildで配布用HTMLへインライン化。最新版の生成済みHTMLだけをコミットしてください。版番号を更新する際は、旧HTMLを削除し、ビルド・テスト・CI・READMEの参照先も更新してください。
 - Node/jsdomでDOM操作、ソルバー切り替え、STL入出力、面操作、パッチ同期、動的設定、作業復元を検証。ZIPはPython標準zipfileでもCRCと内容を確認します。
 - OpenFOAM v2412の実行環境がないため、メッシュ生成・ソルバー計算は未実施です。実ブラウザでのWebGL描画・ピッキングの目視確認も実行環境の閲覧制限により未実施です。
 - 1 STLにつき50万三角形 / 80 MB、メッシュ用は全体で75万三角形、初期水用は別枠で50万三角形が上限。CSVは20 MBまで。大規模形状は事前に軽量化してください。

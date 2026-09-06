@@ -15,5 +15,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: git diff --exit-code -- OpenFOAM_v2412_case_builder_v3.html OpenFOAM_v2412_case_builder_v8_3.html
+      - run: git diff --exit-code -- OpenFOAM_v2412_case_builder_v8_3.html
       - run: npm test
