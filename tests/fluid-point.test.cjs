@@ -62,8 +62,8 @@ test('invalid edits immediately remove the old point and valid input restores it
 
 test('domain and selected-face actions update the same marker without hiding it with selected faces',()=>{
   const a=app();try{
-    a.click('demoGeometry');a.click('fitDomain');
-    closeVector(a.api.viewer().point,[-1.26,-1.26,-1.26]);
+    a.click('demoGeometry');a.set('locationInMesh','(0.4 0.2 -0.1)');a.click('fitDomain');
+    closeVector(a.api.viewer().point,[.4,.2,-.1]);
     const f=a.api.allFaces()[0];f.selected=true;a.set('fluidOffset','0.2');
     const expected=[0,1,2].map(i=>(f.v[0][i]+f.v[1][i]+f.v[2][i])/3+.2*f.n[i]);
     // The existing face-offset action formats its result to seven significant digits.

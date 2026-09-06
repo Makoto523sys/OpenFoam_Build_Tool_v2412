@@ -29,6 +29,12 @@
       <div class="background-mesh-controls">
         <label class="inlineCheck" for="showBackgroundMesh"><input id="showBackgroundMesh" type="checkbox" checked aria-describedby="backgroundMeshHelp">背景メッシュの範囲を表示</label>
         <a href="#backgroundMeshSettings">背景領域の座標・縮尺を編集</a>
+        <div class="domain-fit-row">
+          <div><label for="domainMarginPercent">STL外周の余白（各側）[%]</label><input id="domainMarginPercent" type="number" min="0" step="any" value="20" aria-describedby="domainFitHelp domainFitStatus"></div>
+          <button id="fitDomain" class="light" disabled>STL全体から背景範囲を自動設定</button>
+        </div>
+        <p id="domainFitHelp" class="hint">メッシュ用STLの単位を確認してから押してください。非表示を含むすべてのメッシュ用STLを囲む直方体を設定します。余白は0より大きい値を指定してください。</p>
+        <p id="domainFitStatus" class="note" role="status" aria-live="polite" hidden></p>
         <p id="backgroundMeshStatus" class="hint" role="status" aria-live="polite"></p>
         <p id="backgroundMeshHelp" class="hint">黄色の枠線がblockMeshで作る領域の外周です。枠線はSTL越しにも表示します。セルの分割線は表示しません。表示をオフにしてもメッシュ設定は保持されます。</p>
       </div>
@@ -53,9 +59,9 @@
       <div id="visualPatchStatus" class="note" role="status" aria-live="polite" hidden></div>
       <a id="assignedPatchLink" href="#boundaryPatchesPanel" hidden>第4欄の境界パッチを確認</a>
       <details><summary>領域と流れ方向</summary>
-        <div class="btns"><button id="fitDomain" class="light">STLから背景領域を設定</button><button id="flowX">流れ +X</button><button id="flowY">流れ +Y</button><button id="flowZ">流れ +Z</button></div>
+        <div class="btns"><button id="flowX">流れ +X</button><button id="flowY">流れ +Y</button><button id="flowZ">流れ +Z</button></div>
         <p class="hint">流れ方向は背景面と登録済みのinletに反映します。境界条件を追加する場合は、4番の「形状・背景から追加」を押してください。</p>
-        <p class="hint">背景領域はSTL外接箱に余白20%を付けて設定します。内部流れでは、保持点を容器内の流体側に指定してください。</p>
+        <p class="hint">背景範囲はSTLビュー下の「STL全体から背景範囲を自動設定」で設定できます。保持点は、残す流体領域内に指定してください。</p>
         <label for="fluidOffset">選択面中心からの距離 [m]（STL法線方向が正）</label><input id="fluidOffset" type="number" step="any" value="0.001"><button id="setFluidPoint" class="ghost">選択面からlocationInMeshを設定</button>
       </details>
       <p class="hint"><a href="#initialWaterPanel">初期水領域（ボックス / 専用STL）</a>・<a href="#accelerationPanel">加速度CSV</a>は下の専用欄で設定します。</p>

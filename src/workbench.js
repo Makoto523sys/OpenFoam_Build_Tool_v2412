@@ -81,7 +81,7 @@ function pickFace(f,add){
   viewer?.recolor();updateSelection();
 }
 async function importGeometryFiles(files){
-  if(!files.length)return;importBusy=true;generate();const errors=[];
+  if(!files.length)return;clearDomainFitStatus();importBusy=true;generate();const errors=[];
   for(const file of files){
     try{
       if(!/\.stl$/i.test(file.name))throw Error('3D編集はSTLに対応しています。');
@@ -160,10 +160,24 @@ function setFlow(axis){
   if(patchRow('inlet'))upsertPatch({name:'inlet',purpose:'velocityInlet',U:v,normal:v});
   generate();
 }
+function clearDomainFitStatus(){$('domainFitStatus').hidden=true;$('domainMarginPercent').removeAttribute('aria-invalid');}
 function fitDomain(){
-  const fs=allFaces();if(!fs.length)return;const b=Geometry.bounds(fs),scale=Number(val('stlScale'));const extent=Geometry.sub(b.max,b.min),floor=Math.max(...extent)*.2;
-  const min=b.min.map((x,i)=>(x-Math.max(extent[i]*.2,floor*.1))*scale),max=b.max.map((x,i)=>(x+Math.max(extent[i]*.2,floor*.1))*scale);
-  $('convertToMeters').value=1;$('boxMin').value='('+min.join(' ')+')';$('boxMax').value='('+max.join(' ')+')';$('locationInMesh').value='('+min.map((x,i)=>x+(max[i]-x)*.05).join(' ')+')';$('includeBlockMesh').checked=true;generate();setStatus('背景領域を設定しました。保持点は外部流れ用に箱の隅へ設定しています。内部流れでは流体側の点へ変更してください。');
+  const status=$('domainFitStatus'),fail=text=>{status.textContent=text;status.className='note danger';status.hidden=false;return false;};
+  const fs=allFaces();if(!fs.length)return fail('メッシュ用STLを読み込んでください。');
+  const scale=Number(val('stlScale')),margin=Number(val('domainMarginPercent'));
+  const validMargin=val('domainMarginPercent').trim()!==''&&Number.isFinite(margin)&&margin>0;
+  $('domainMarginPercent').setAttribute('aria-invalid',String(!validMargin));
+  if(!validMargin)return fail('余白は0より大きい有限の値 [%] を指定してください。');
+  if(!Number.isFinite(scale)||scale<=0)return fail('STLの座標単位を確認してください。');
+  const b=Geometry.bounds(fs),extent=Geometry.sub(b.max,b.min),ratio=margin/100,floor=Math.max(...extent)*ratio*.1;
+  const padding=extent.map(x=>Math.max(x*ratio,floor));
+  const min=b.min.map((x,i)=>(x-padding[i])*scale),max=b.max.map((x,i)=>(x+padding[i])*scale);
+  if(![...min,...max].every(Number.isFinite)||min.some((x,i)=>!(x<b.min[i]*scale&&max[i]>b.max[i]*scale)))return fail('STLの寸法・単位・余白を確認してください。有効な背景範囲を計算できません。');
+  // Only the background box changes; the retained fluid point is user-owned.
+  $('convertToMeters').value='1';$('boxMin').value='('+min.join(' ')+')';$('boxMax').value='('+max.join(' ')+')';
+  $('includeBlockMesh').checked=true;$('showBackgroundMesh').checked=true;generate();refreshViewer(true);
+  status.textContent=`${geometryParts.size} 個のメッシュ用STL全体を囲む背景範囲を設定しました（各側の余白 ${margin}%）。保持点 locationInMesh は指定済みの座標を保持しています。`;
+  status.className='note ok';status.hidden=false;return true;
 }
 function setFluidPoint(){const fs=selectedFaces();if(!fs.length)return;const scale=Number(val('stlScale')),m=Geometry.measure(fs),center=[0,0,0];let weight=0;for(const f of fs){const a=Geometry.measure([f]).area;weight+=a;for(let j=0;j<3;j++)center[j]+=a*(f.v[0][j]+f.v[1][j]+f.v[2][j])/3;}const p=center.map((x,j)=>x/weight*scale+m.normal[j]*num('fluidOffset'));$('locationInMesh').value='('+p.map(fmt).join(' ')+')';generate();setStatus('locationInMeshを設定しました。面の法線方向と、点が流体内部にあることを確認してください。');}
 function geometryPatchNames(g){const p=geometryParts.get(g.file);return p?[...new Set(p.faces.map(f=>f.patch))]:[g.name];}
@@ -175,6 +189,7 @@ function surfaceRegionEntries(g){
   return '            regions\n            {\n'+geometryPatchNames(g).map(n=>`                ${n} { level (${g.levelMin} ${g.levelMax}); patchInfo { type ${purposeType(getPatches().find(p=>p.name===n)?.purpose||'wallNoSlip')}; } }`).join('\n')+'\n            }\n';
 }
 function updateWorkbenchStatus(){
+  $('fitDomain').disabled=!geometryParts.size||importBusy;
   const mode=val('meshMotion'),s=cfg();
   if(viewer){const scale=Number(val('stlScale'))||1;syncViewerOverlays();viewer.setGuide(['ami','mrf'].includes(mode)?rotorSurface().map(f=>({...f,v:f.v.map(v=>v.map(x=>x/scale))})):[]);if(!viewer.gl)viewer.draw();}
   $('rotationControls').classList.toggle('hidden',!['mrf','ami','rigid'].includes(mode));$('refineControls').classList.toggle('hidden',mode!=='refine');
@@ -270,11 +285,11 @@ function restoreProject(data){
   if(data.parts.reduce((n,p)=>n+(p.faces?.length||0),0)>750000)throw Error('作業ファイルの三角形数が上限を超えています。');
   const auxiliaryStaged=stageAuxiliaryProject(data);
   const staged=new Map();for(const p of data.parts){if(!/^[A-Za-z_][A-Za-z0-9_]*\.stl$/.test(p.file)||staged.has(p.file))throw Error('作業ファイルのSTL名が不正です。');const faces=p.faces.map(f=>({...Geometry.triangle(f.v,f.region),patch:Geometry.word(f.patch),hidden:!!f.hidden,file:p.file}));staged.set(p.file,{file:p.file,originalName:p.originalName,faces,topology:Geometry.topology(faces)});}
-  for(const [id,value] of Object.entries({showBackgroundMesh:true,...auxiliaryProjectInputs(data)})){const el=$(id);if(!el||el.type==='file'||!el.matches('input,select,textarea')||['previewText','previewSelect','applicationMirror'].includes(id))continue;if(el.type==='checkbox')el.checked=!!value;else el.value=String(value);}
+  for(const [id,value] of Object.entries({showBackgroundMesh:true,domainMarginPercent:'20',...auxiliaryProjectInputs(data)})){const el=$(id);if(!el||el.type==='file'||!el.matches('input,select,textarea')||['previewText','previewSelect','applicationMirror'].includes(id))continue;if(el.type==='checkbox')el.checked=!!value;else el.value=String(value);}
   if(!solverDb.some(s=>s.id===val('solver')))$('solver').value='pimpleFoam';applySolverDefaults(val('solver'));
   $('patchTable').querySelector('tbody').innerHTML='';data.patches.forEach(p=>addPatch({...patchDefaults('patch'),...p}));
   $('geometryTable').querySelector('tbody').innerHTML='';data.geometries.forEach(addGeometry);geometryParts.clear();selectedGeometryFiles.clear();for(const [name,p] of staged){geometryParts.set(name,p);selectedGeometryFiles.set(name,true);}
-  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set(getPatches().map(p=>p.name).filter(name=>meshPatchRequirements(true).has(name)));geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();clearVisualPatchStatus();setStatus('作業を復元しました。');
+  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set(getPatches().map(p=>p.name).filter(name=>meshPatchRequirements(true).has(name)));geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();clearVisualPatchStatus();clearDomainFitStatus();setStatus('作業を復元しました。');
 }
 function demoGeometry(){
   if(geometryParts.size){setStatus('デモを追加する前に作業を保存し、形状一覧の初期化で既存形状を解除してください。');return;}
@@ -298,6 +313,7 @@ function initWorkbench(){
   bind('clearSelection',()=>{allFaces().forEach(f=>f.selected=false);refreshViewer();});
   bind('undoGeometry',()=>{const state=geometryHistory.pop();if(state){allFaces().forEach((f,i)=>Object.assign(f,state.faces[i]));$('patchTable').querySelector('tbody').replaceChildren();state.patches.forEach(addPatch);}generate();refreshViewer();});
   bind('fitDomain',fitDomain);bind('setFluidPoint',setFluidPoint);for(const a of ['X','Y','Z'])bind('flow'+a,()=>setFlow(a.toLowerCase()));
+  for(const id of ['domainMarginPercent','stlScale','boxMin','boxMax','convertToMeters'])$(id).addEventListener('input',clearDomainFitStatus);
   bind('saveProject',saveProject);bind('loadProject',()=>$('projectPicker').click());$('projectPicker').addEventListener('change',async e=>{try{const file=e.target.files[0];if(file){if(file.size>200*1024*1024)throw Error('作業ファイルが大きすぎます。');restoreProject(JSON.parse(await file.text()));}}catch(err){setStatus('作業を開けません: '+err.message);}e.target.value='';});
   $('stlScale').addEventListener('change',()=>{updateSelection();generate();});
   // Make original labels accessible without changing their contextual help.
