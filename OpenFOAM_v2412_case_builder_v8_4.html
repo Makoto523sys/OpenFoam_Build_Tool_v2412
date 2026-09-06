@@ -243,7 +243,8 @@ details{border:1px solid var(--line);border-radius:12px;background:#fff;padding:
     <section class="panel">
       <h2>4. 境界パッチと0ディレクトリ</h2>
       <div class="note ok">強化点: patch用途を増やし、<b>体積流量 Q [m3/s]</b> と <b>質量流量 mdot [kg/s]</b> を境界条件として直接指定できるようにしました。</div>
-      <div class="btns"><button id="addPatch" class="light">patch追加</button><button id="resetPatches" class="ghost">標準patchへ戻す</button><button id="guessFields" class="secondary">必要field再推定</button></div>
+      <div class="btns"><button id="addPatch" class="light">patch追加</button><button id="addMeshPatches" class="light">形状・背景から追加</button><button id="resetPatches" class="ghost">一覧を空にする</button><button id="guessFields" class="secondary">必要field再推定</button></div>
+      <p id="patchEmptyStatus" class="hint">境界パッチは未登録です。「patch追加」で1行ずつ登録するか、「形状・背景から追加」で現在のメッシュ設定から追加してください。</p>
       <div class="tableWrap" style="margin-top:10px"><table id="patchTable"><thead><tr><th>patch名</th><th>用途</th><th>U/接線速度</th><th>normal</th><th>面積A</th><th>Q</th><th>mdot</th><th>p/p_rgh</th><th>T</th><th>alpha</th><th></th></tr></thead><tbody></tbody></table></div>
       <div class="hint">体積流量/質量流量入口では <span class="mono">flowRateInletVelocity</span>、出口では <span class="mono">flowRateOutletVelocity</span> を生成します。normalと面積Aは初期valueの推算に使います。</div>
       <details>
@@ -1177,7 +1178,8 @@ function bindEvents(){
   $('presetVOF').addEventListener('click',()=>{applyPreset('vof'); generate();});
   $('presetLES').addEventListener('click',()=>{applyPreset('les'); generate();});
   $('presetHeat').addEventListener('click',()=>{applyPreset('heat'); generate();});
-  $('addPatch').addEventListener('click',()=>{addPatch({name:'patch'+($('patchTable').querySelectorAll('tbody tr').length+1), purpose:'genericPatch', U:'(0 0 0)', normal:'(1 0 0)', area:'1', Q:'0.01', mdot:'1', p:'0', T:'293.15', alpha:'0'}); generate();});
+  $('addPatch').addEventListener('click',()=>{const names=new Set(getPatches().map(p=>p.name));let n=1;while(names.has('patch'+n))n++;addPatch({...patchDefaults('patch'+n,'genericPatch'),Q:'0.01'});generate();});
+  $('addMeshPatches').addEventListener('click',()=>{syncVisualPatches(true);generate();});
   $('resetPatches').addEventListener('click',()=>{resetPatches(); generate();});
   $('guessFields').addEventListener('click',()=>{manualFields=null; generate();});
   $('autoFieldsBtn').addEventListener('click',()=>{manualFields=null; generate();});
@@ -1268,7 +1270,7 @@ function syncBlockMeshFacesToPatches(){
   for(const g of blockMeshGroupedPatches()){
     if(!existing.has(g.name)){
       addPatch({name:g.name, purpose:blockMeshPatchPurpose(g.name,g.type), U:g.name.toLowerCase().includes('inlet')?'(1 0 0)':'(0 0 0)', normal:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:g.name.toLowerCase().includes('inlet')?'1':'0'});
-      existing.add(g.name);
+      managedPatchNames.add(g.name);existing.add(g.name);
     }
   }
 }
@@ -1288,12 +1290,7 @@ function setBlockMesh2DXY(){
   setBlockMeshFace('bmZMinusName','bmZMinusType','frontAndBack','empty');
   setBlockMeshFace('bmZPlusName','bmZPlusType','frontAndBack','empty');
 }
-function resetPatches(){ const tbody=$('patchTable').querySelector('tbody'); tbody.innerHTML=''; [
-  {name:'inlet', purpose:'velocityInlet', U:'(1 0 0)', normal:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:'1'},
-  {name:'outlet', purpose:'pressureOutlet', U:'(0 0 0)', normal:'(1 0 0)', area:'1', Q:'1', mdot:'1', p:'0', T:'293.15', alpha:'0'},
-  {name:'walls', purpose:'wallNoSlip', U:'(0 0 0)', normal:'(0 1 0)', area:'1', Q:'0', mdot:'0', p:'0', T:'293.15', alpha:'0'},
-  {name:'frontAndBack', purpose:'empty', U:'(0 0 0)', normal:'(0 0 1)', area:'1', Q:'0', mdot:'0', p:'0', T:'293.15', alpha:'0'}
-].forEach(addPatch); }
+function resetPatches(){ $('patchTable').querySelector('tbody').replaceChildren(); managedPatchNames.clear(); }
 function addPatch(p){
   const tbody=$('patchTable').querySelector('tbody'); const tr=document.createElement('tr');
   tr.innerHTML=`<td><input data-k="name" class="wide" value="${esc(p.name)}" title="polyMesh/boundaryに存在するpatch名"></td>
@@ -1308,7 +1305,7 @@ function addPatch(p){
   <td><input data-k="alpha" class="num" value="${esc(p.alpha)}" title="VOF alpha.water。水なら1、空気なら0"></td>
   <td><button class="danger small" data-remove>削除</button></td>`;
   tbody.appendChild(tr); tr.querySelector('[data-k="purpose"]').value=p.purpose;
-  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}managedPatchNames.delete(old);managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();})); tr.querySelector('[data-remove]').addEventListener('click',()=>{tr.remove(); generate();});
+  tr.dataset.patchName=p.name; tr.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',()=>{if(el.dataset.k==='name'&&/^[A-Za-z_][A-Za-z0-9_]*$/.test(el.value)){const old=tr.dataset.patchName;allFaces().forEach(f=>{if(f.patch===old)f.patch=el.value;});for(const def of blockMeshFaceDefs()){if($('bm'+def.key+'Name').value===old)$('bm'+def.key+'Name').value=el.value;}if(managedPatchNames.delete(old))managedPatchNames.add(el.value);tr.dataset.patchName=el.value;if(workbenchReady)refreshViewer();}generate();})); tr.querySelector('[data-remove]').addEventListener('click',()=>{tr.remove(); generate();});
 }
 function getPatches(){ return [...$('patchTable').querySelectorAll('tbody tr')].map(tr=>{const o={}; tr.querySelectorAll('[data-k]').forEach(el=>o[el.dataset.k]=el.value.trim()); return o;}).filter(p=>p.name); }
 function cfg(){ const solver=solverDb.find(s=>s.id===val('solver'))||solverDb[0]; const mode=solver.mode; const compressible=mode==='compressible'||val('solver').includes('rho')||val('solver').includes('buoyantPimpleFoam'); const heatOn=val('heat')==='on'||mode==='boussinesq'||mode==='compressible'||mode==='cht'; const vof=mode==='vof'||val('solver').includes('inter'); const pMode=val('pressureMode')==='auto'?(vof||mode==='boussinesq'||val('solver').includes('buoyant')?'p_rgh':'p'):val('pressureMode'); const Uin=getPatches().find(p=>p.purpose.includes('Inlet'))?.U||'(1 0 0)'; const turb=turbulenceValues(magVector(Uin)||1); return {solver,mode,compressible,heatOn,vof,pMode,patches:getPatches(),turb,caseName:sanitizeCaseName(val('caseName'))}; }
@@ -1323,7 +1320,7 @@ function currentFields(){ return manualFields ? [...manualFields] : autoFieldKey
 function generate(){ motionPatchCache=new Map(); syncVisualPatches(); const c=cfg(); $('applicationMirror').value=val('solver'); const files=[]; const root=c.caseName; const fieldKeys=currentFields(); files.push({path:`${root}/README_run.md`, text:readme(c,fieldKeys)}); files.push({path:`${root}/system/controlDict`, text:controlDict(c)}); files.push({path:`${root}/system/fvSchemes`, text:fvSchemes(c,fieldKeys)}); files.push({path:`${root}/system/fvSolution`, text:fvSolution(c,fieldKeys)}); files.push({path:`${root}/system/decomposeParDict`, text:decomposeParDict()}); if(checked('includeBlockMesh')) files.push({path:`${root}/system/blockMeshDict`, text:blockMeshDict()}); if(checked('includeSnappy')){ files.push({path:`${root}/system/snappyHexMeshDict`, text:snappyHexMeshDict()}); files.push({path:`${root}/system/surfaceFeatureExtractDict`, text:surfaceFeatureExtractDict()}); } if(c.vof) files.push({path:`${root}/system/setFieldsDict`, text:setFieldsDict(c)}); files.push({path:`${root}/constant/turbulenceProperties`, text:turbulenceProperties()}); if(c.vof) files.push({path:`${root}/constant/transportProperties`, text:vofTransportProperties()}); else if(c.compressible) files.push({path:`${root}/constant/thermophysicalProperties`, text:thermophysicalProperties()}); else files.push({path:`${root}/constant/transportProperties`, text:transportProperties()}); if(c.heatOn||c.vof||c.pMode==='p_rgh'||c.solver.id.includes('buoyant')) files.push({path:`${root}/constant/g`, text:gFile()}); if(c.mode==='cht') files.push({path:`${root}/constant/regionProperties`, text:regionProperties()}); for(const key of fieldKeys){ const f=clone(allFieldTemplates[key]); if(!f) continue; patchFieldInternal(f,c); files.push({path:`${root}/0/${f.object}`, text:fieldFile(f,c)}); } files.push({path:`${root}/Allrun`, text:allrun(c)}); files.push({path:`${root}/Allclean`, text:allclean()}); files.push(...motionFiles(c),...auxiliaryInputFiles(c)); outputs=files; renderFieldChips(fieldKeys); renderOutputs(); if(workbenchReady) updateWorkbenchStatus(); updateAuxiliaryInputsUI(); }
 function patchFieldInternal(f,c){ if(f.object==='p_rgh'&&c.compressible) f.internal='uniform 101325'; if(f.object==='T') f.internal=`uniform ${fmt(num('TRef',293.15))}`; if(f.object==='k') f.internal=`uniform ${fmt(c.turb.k)}`; if(f.object==='epsilon') f.internal=`uniform ${fmt(c.turb.epsilon)}`; if(f.object==='omega') f.internal=`uniform ${fmt(c.turb.omega)}`; if(f.object==='nut') f.internal=`uniform ${fmt(c.turb.nut)}`; if(f.object==='nuTilda') f.internal=`uniform ${fmt(c.turb.nuTilda)}`; }
 function renderFieldChips(keys){ $('fieldChips').innerHTML=keys.map(k=>`<span class="chip"><b>${esc(allFieldTemplates[k]?.object||k)}</b><span>${esc(allFieldTemplates[k]?.desc||'')}</span><button class="small" data-rm-field="${k}">×</button></span>`).join(''); $('fieldChips').querySelectorAll('[data-rm-field]').forEach(btn=>btn.addEventListener('click',()=>{manualFields=currentFields().filter(k=>k!==btn.dataset.rmField); generate();})); }
-function renderOutputs(){ const errors=blockingErrors(); const msgs=[...errors.map(x=>'エラー: '+x),...validate()]; $('downloadZip').disabled=errors.length>0||importBusy; $('downloadSelected').disabled=errors.length>0; $('copyAll').disabled=errors.length>0; $('validationBox').className='note '+(errors.length?'danger':msgs.some(m=>m.startsWith('注意')||m.startsWith('要確認'))?'warn':'ok'); $('validationBox').innerHTML=msgs.map(esc).join('<br>'); $('pathList').textContent=[...outputs.map(o=>o.path), ...[...selectedGeometryFiles.keys()].map(f=>geometryZipPath(cfg().caseName,f)+'  [binary geometry]')].join('\n'); const prev=selectedPath; $('previewSelect').innerHTML=outputs.map(o=>`<option value="${esc(o.path)}">${esc(o.path)}</option>`).join(''); selectedPath=outputs.find(o=>o.path===prev)?.path||outputs[0]?.path||''; $('previewSelect').value=selectedPath; renderPreview(); }
+function renderOutputs(){ $('patchEmptyStatus').hidden=!!$('patchTable').querySelector('tbody tr');const errors=blockingErrors(); const msgs=[...errors.map(x=>'エラー: '+x),...validate()]; $('downloadZip').disabled=errors.length>0||importBusy; $('downloadSelected').disabled=errors.length>0; $('copyAll').disabled=errors.length>0; $('validationBox').className='note '+(errors.length?'danger':msgs.some(m=>m.startsWith('注意')||m.startsWith('要確認'))?'warn':'ok'); $('validationBox').innerHTML=msgs.map(esc).join('<br>'); $('pathList').textContent=[...outputs.map(o=>o.path), ...[...selectedGeometryFiles.keys()].map(f=>geometryZipPath(cfg().caseName,f)+'  [binary geometry]')].join('\n'); const prev=selectedPath; $('previewSelect').innerHTML=outputs.map(o=>`<option value="${esc(o.path)}">${esc(o.path)}</option>`).join(''); selectedPath=outputs.find(o=>o.path===prev)?.path||outputs[0]?.path||''; $('previewSelect').value=selectedPath; renderPreview(); }
 function renderPreview(){ $('previewText').value=outputs.find(o=>o.path===selectedPath)?.text||''; }
 function validate(){
   const c=cfg(), msgs=[];
@@ -1340,8 +1337,8 @@ function validate(){
   const bmGroups=blockMeshGroupedPatches();
   const conflict=bmGroups.filter(g=>g.typeConflict);
   if(conflict.length) msgs.push('要確認: blockMeshで同じpatch名に複数のtypeが指定されています: '+conflict.map(g=>g.name).join(', '));
-  const missingIn0=bmGroups.filter(g=>!names.includes(g.name)).map(g=>g.name);
-  if(checked('includeBlockMesh') && missingIn0.length) msgs.push('注意: blockMeshのpatchが0ディレクトリpatch表に未登録です。「0ディレクトリpatch表へ反映」を押すと追加できます: '+missingIn0.join(', '));
+  const missingIn0=[...meshPatchRequirements().keys()].filter(name=>!names.includes(name));
+  if(missingIn0.length) msgs.push('注意: 0ディレクトリの境界パッチが未登録です。「patch追加」または「形状・背景から追加」で登録してください: '+missingIn0.join(', '));
   if(checked('includeBlockMesh')) msgs.push('blockMesh面割当: '+bmGroups.map(g=>`${g.name}/${g.type}=[${g.axes.join(',')}]`).join(' ; '));
   const geoms=getGeometries(); const badGeom=geoms.filter(g=>/\s/.test(g.file)||/\s/.test(g.name));
   if(badGeom.length) msgs.push('要確認: 形状file/nameに空白があります。OpenFOAM辞書・ファイル管理上、空白なしを推奨します。');
@@ -1727,15 +1724,21 @@ function patchDefaults(name,purpose='wallNoSlip') {return {name,purpose,U:'(0 0 
 function patchRow(name){return [...$('patchTable').querySelectorAll('tbody tr')].find(tr=>tr.querySelector('[data-k="name"]').value===name);}
 function upsertPatch(p){const row=patchRow(p.name);if(row){for(const [k,v] of Object.entries(p)){const el=row.querySelector(`[data-k="${k}"]`);if(el)el.value=v;}}else addPatch({...patchDefaults(p.name),...p});}
 function purposeType(purpose){return ['empty','symmetryPlane','symmetry','wedge','cyclic','cyclicAMI'].includes(purpose)?purpose:/wall/i.test(purpose)?'wall':'patch';}
-function syncVisualPatches(){
+function meshPatchRequirements(){
   const required=new Map();
   if(checked('includeBlockMesh'))for(const g of blockMeshGroupedPatches())required.set(g.name,blockMeshPatchPurpose(g.name,g.type));
   if(checked('includeSnappy'))for(const p of geometryParts.values())for(const f of p.faces)required.set(f.patch,'wallNoSlip');
   if(val('meshMotion')==='ami'){required.set('rotorAMI','cyclicAMI');required.set('statorAMI','cyclicAMI');}
-  const existing=new Map(getPatches().map(p=>[p.name,p]));
-  for(const [name,purpose] of required){if(!existing.has(name))addPatch({...patchDefaults(name,purpose),U:purpose==='velocityInlet'?'(1 0 0)':'(0 0 0)'});}
-  for(const name of managedPatchNames)if(!required.has(name))patchRow(name)?.remove();
-  managedPatchNames=new Set(required.keys());
+  return required;
+}
+function syncVisualPatches(addMissing=false){
+  const required=meshPatchRequirements(),existing=new Set(getPatches().map(p=>p.name)),compressible=cfg().compressible;
+  for(const name of managedPatchNames)if(!required.has(name)){patchRow(name)?.remove();managedPatchNames.delete(name);}
+  if(addMissing)for(const [name,purpose] of required)if(!existing.has(name)){
+    const p=patchDefaults(name,purpose);if(purpose==='velocityInlet')p.U='(1 0 0)';
+    if(compressible&&purpose==='pressureOutlet')p.p='101325';
+    addPatch(p);managedPatchNames.add(name);
+  }
 }
 function assignVisualPatch(){
   const fs=selectedFaces(),name=val('visualPatchName').trim();
@@ -1747,10 +1750,10 @@ function assignVisualPatch(){
   rememberGeometry();fs.forEach(f=>f.patch=name);
   const m=Geometry.measure(fs),scale=Number(val('stlScale'));
   upsertPatch({...patchDefaults(name,val('visualPurpose')),U:val('visualU'),Q:val('visualQ'),mdot:val('visualMdot'),p:val('visualP'),T:val('visualT'),alpha:val('visualAlpha'),area:fmt(m.area*scale*scale),normal:'('+m.normal.join(' ')+')'});
-  generate();refreshViewer();setStatus(`${name} を ${fs.length} 三角形に割り当てました。STL・snappyHexMeshDict・0/のパッチ名を同期します。`);
+  managedPatchNames.add(name);generate();refreshViewer();setStatus(`${name} を ${fs.length} 三角形に割り当てました。STL・snappyHexMeshDict・0/のパッチ名を同期します。`);
 }
 function setStatus(text){$('geometryStatus').textContent=text;}
-function setFlow(axis){setBlockMeshPreset(axis);const v=['x','y','z'].map(a=>a===axis?1:0);syncVisualPatches();upsertPatch({name:'inlet',purpose:'velocityInlet',U:'('+v.join(' ')+')',normal:'('+v.join(' ')+')'});generate();}
+function setFlow(axis){setBlockMeshPreset(axis);const v=['x','y','z'].map(a=>a===axis?1:0);syncBlockMeshFacesToPatches();upsertPatch({name:'inlet',purpose:'velocityInlet',U:'('+v.join(' ')+')',normal:'('+v.join(' ')+')'});generate();}
 function fitDomain(){
   const fs=allFaces();if(!fs.length)return;const b=Geometry.bounds(fs),scale=Number(val('stlScale'));const extent=Geometry.sub(b.max,b.min),floor=Math.max(...extent)*.2;
   const min=b.min.map((x,i)=>(x-Math.max(extent[i]*.2,floor*.1))*scale),max=b.max.map((x,i)=>(x+Math.max(extent[i]*.2,floor*.1))*scale);
@@ -1853,7 +1856,7 @@ function buildAllrun(c){
   if(num('nProc')>1)commands.push('runApplication decomposePar',`runParallel -np ${val('nProc')} ${c.solver.id}`,'runApplication reconstructPar');else commands.push(`runApplication ${c.solver.id}`);
   return `#!/bin/sh\nset -e\ncd "\${0%/*}" || exit 1\n. "\${WM_PROJECT_DIR:?Source OpenFOAM v2412 first}/bin/tools/RunFunctions"\n[ "\${WM_PROJECT_VERSION:-}" = v2412 ] || { echo "OpenFOAM v2412 is required" >&2; exit 1; }\n${commands.join('\n')}\ntouch ${c.caseName}.foam\n`;
 }
-function caseGuide(c){return auxiliaryGuide(c)+`# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Region names match the boundary-condition table.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
+function caseGuide(c){return auxiliaryGuide(c)+`# Visual setup notes\n\nSTL coordinates have been converted to metres once at export. Hidden faces remain in the exported geometry. Register the mesh boundary regions in the boundary-condition table before using the case.\n\nMesh mode: ${val('meshMotion')}.\n${val('meshMotion')==='ami'?'The generated cylinder must be closed, enclose the moving part, and avoid stationary walls. Check rotorZone cell membership, nonzero rotorAMI/statorAMI face counts, and AMI weights before trusting results.\n':''}Generated dictionaries have automated regression coverage; no OpenFOAM solver has been run by this tool. Run surfaceCheck on imported geometry, inspect the retained fluid region, run checkMesh, and check conservation and mesh/time-step sensitivity.\n\nFor an internal nozzle, the inlet face must bound the retained fluid cells. An isolated sheet inside a connected fluid volume is not automatically a one-sided inlet. Close the nozzle solid (including its cap), hide outer faces in the viewer, then assign the cap.\n\nUse movingWall for walls following mesh motion. Rigid mode rotates the entire domain. MRF keeps the mesh fixed.\n\nCHT region coupling, arbitrary cyclic pairs, overset and six-DoF are not configured by this version.\n\n---\n\n`;}
 function projectSnapshot(){const inputs={};document.querySelectorAll('input[id],select[id],textarea[id]').forEach(el=>{if(!['file'].includes(el.type)&&!['previewText','previewSelect','applicationMirror','fieldAddSelect'].includes(el.id))inputs[el.id]=el.type==='checkbox'?el.checked:el.value;});const data={format:'OpenFOAM-Case-Builder',version:3,auxiliary:auxiliaryProjectData(),inputs,patches:getPatches(),geometries:getGeometries(),parts:[...geometryParts.values()].map(p=>({file:p.file,originalName:p.originalName,faces:p.faces.map(f=>({v:f.v,region:f.region,patch:f.patch,hidden:f.hidden}))})),manualFields};return data;}
 function saveProject(){if(auxiliaryBusy){setStatus('CSV / 初期水領域STLの読み込み完了を待ってください。');return;}const data=projectSnapshot();saveBlob(new Blob([JSON.stringify(data)],{type:'application/json'}),sanitizeCaseName(val('caseName'))+'.project.json');}
 function restoreProject(data){
@@ -1865,7 +1868,7 @@ function restoreProject(data){
   if(!solverDb.some(s=>s.id===val('solver')))$('solver').value='pimpleFoam';applySolverDefaults(val('solver'));
   $('patchTable').querySelector('tbody').innerHTML='';data.patches.forEach(p=>addPatch({...patchDefaults('patch'),...p}));
   $('geometryTable').querySelector('tbody').innerHTML='';data.geometries.forEach(addGeometry);geometryParts.clear();selectedGeometryFiles.clear();for(const [name,p] of staged){geometryParts.set(name,p);selectedGeometryFiles.set(name,true);}
-  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set();geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();setStatus('作業を復元しました。');
+  manualFields=Array.isArray(data.manualFields)?data.manualFields.filter(k=>Object.hasOwn(allFieldTemplates,k)):null;managedPatchNames=new Set(getPatches().map(p=>p.name).filter(name=>meshPatchRequirements().has(name)));geometryHistory.length=0;applyAuxiliaryProject(auxiliaryStaged);refreshViewer(true);generate();setStatus('作業を復元しました。');
 }
 function demoGeometry(){
   if(geometryParts.size){setStatus('デモを追加する前に作業を保存し、形状一覧の初期化で既存形状を解除してください。');return;}
