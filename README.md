@@ -8,7 +8,7 @@ STLを見ながらパッチと境界条件を設定する、オフラインの�
 
 **実行時の不具合を修正した版は、画面上部に「v2412実行前検査 修正版」と表示します。** PIMPLE残差制御、solverInfo、入口/出口監視、実パッチ・checkMeshの検査を更新しました。配布HTMLを再ダウンロードし、ケースを再出力してください。ZIPの全ファイルを展開し、OpenCFD v2412をsourceしたシェルで `sh Allrun` を実行します。実行前検査にはPython 3が必要です。
 
-[修正内容・検証範囲・v2412での受入手順](docs/v2412-runtime-fixes.md)を参照してください。**この修正版について、実OpenFOAMの起動と元ケースの凹セル改善は未検証です。** ソルバーと監視の6種類の小ケースを生成するスクリプトを同梱しています。
+[修正内容・検証範囲・v2412での受入手順](docs/v2412-runtime-fixes.md)を参照してください。**2026-09-06、ユーザーのOpenCFD v2412 patch=260127環境で、小規模6ケースの通常実行と残差・流量監視の正常終了が報告されました。** 対象コミット・HTMLのSHAと確認範囲は[実行確認記録](docs/verification-v2412-2026-09-06.md)に記載しています。元ケースの境界条件・寸法の確認、凹セル改善、修正版からの一式再出力と実行は残っています。6ケースの成功は元ケースの物理的妥当性を示すものではありません。
 
 ## 基本操作
 
@@ -212,7 +212,7 @@ chmod +x Allrun Allclean
 ./Allrun
 ```
 
-Allrunはメッシュ生成、必要なAMI/MRF処理、checkMesh、VOFのsetFields、ソルバーを順に実行します。並列数1なら直列、それ以外ならdecomposeParとrunParallelを使用します。blockMesh無効時は既存のconstant/polyMeshが必要です。失敗時はそこで停止します。標準RunFunctionsは既存ログを持つ処理をスキップするため、条件変更後は新しいケースへ出力するか、対象ログと生成物を適切に整理してください。
+Allrunはメッシュ生成、必要なAMI/MRF処理、checkMeshと実パッチ・初期場・監視対象の検査、VOFのsetFields、ソルバーを順に実行します。並列数1なら直列、それ以外なら検査合格後にdecomposeParと並列ソルバーを実行します。blockMesh無効時は既存のconstant/polyMeshが必要です。各処理は既存ログでスキップせず、checkMeshは毎回新規実行します。終了コードだけでなくログの合否・正常終了と検査前後のメッシュハッシュを照合し、検査不合格ならソルバー実行前に停止します。旧ケースのcontrolDictだけを差し替えず、Allrun、scripts/validate_case.py、system/caseBuilderChecks.json、system/flowMonitorsを含む再出力一式を使用してください。
 
 **このツールはOpenFOAMを実行しません。** 開放辺・非多様体辺の件数は表示しますが、自己交差・法線の整合・流体領域の連結性・AMI品質を保証しません。
 
@@ -231,7 +231,7 @@ npm test
 - 編集対象: src/template.html（既存GUI・辞書）、src/workbench.html / workbench.js（面操作・検査・運動）、geometry.js（STL）、viewer.js（WebGL）、acceleration.js / water-region.js（専用入力の検証・変換）、inputs-ui.js（専用UI・出力・作業保存の統合）、waveform.js / waveform-ui.js（数式評価・軸別波形生成）。
 - npm run buildで配布用HTMLへインライン化。最新版の生成済みHTMLだけをコミットしてください。版番号を更新する際は、旧HTMLを削除し、ビルド・テスト・CI・READMEの参照先も更新してください。
 - Node/jsdomでDOM操作、ソルバー切り替え、STL入出力、面操作、パッチ同期、動的設定、作業復元を検証。ZIPはPython標準zipfileでもCRCと内容を確認します。
-- OpenFOAM v2412の実行環境がないため、メッシュ生成・ソルバー計算は未実施です。実ブラウザでのWebGL描画・ピッキングの目視確認も実行環境の閲覧制限により未実施です。
+- 作者側の作業環境にはOpenFOAM本体がありませんが、ユーザー環境では[小規模6ケースの実v2412実行・監視を確認済み](docs/verification-v2412-2026-09-06.md)です。今回のユーザー確認は全テスト・全物理モデルの網羅検証ではなく、並列計算・長時間計算・層追加ケース・元ケースの品質改善は未検証です。実ブラウザでのWebGL描画・ピッキングの目視確認も作者側では未実施です。
 - 1 STLにつき50万三角形 / 80 MB、メッシュ用は全体で75万三角形、初期水用は別枠で50万三角形が上限。CSVは20 MBまで。大規模形状は事前に軽量化してください。
 
 v2412公式ソースとの照合内容は [docs/verification.md](docs/verification.md) に記録しています。

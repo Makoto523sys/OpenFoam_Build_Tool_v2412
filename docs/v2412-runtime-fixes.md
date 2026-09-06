@@ -1,18 +1,21 @@
 # v8.4: v2412実行時の不具合修正と確認範囲
 
-対象はOpenCFD OpenFOAM v2412。ユーザーの実行報告はpatch=260127、pimpleFoam・RAS kOmegaSST・静止メッシュである。
-この作業環境にはOpenFOAM本体と元ケース/STLがない。以下の生成・検査処理は修正したが、**対象ケースの通常ソルバー実行、凹セルの改善、長時間安定性は未検証**である。
+対象はOpenCFD OpenFOAM v2412。修正の起点となった元ケースはpatch=260127、pimpleFoam・RAS kOmegaSST・静止メッシュである。
+
+**2026-09-06のユーザー報告により、修正版の小規模6ケースはv2412 patch=260127で通常実行・残差監視・流量監視まで確認済み。** 確認対象はmainコミット`0013305a6795226093732d1b27ec68ca13f43075`、配布HTMLのGit blob SHAは`43a176fadcf70d429b6a53892d1ec8761740c8ad`。ケース別結果と証拠の範囲は[実行確認記録](verification-v2412-2026-09-06.md)を参照。
+
+作者側の作業環境にはOpenFOAM本体と元ケース/STLがない。ユーザーの元HTML・元ケースも今回の検証では未変更であり、**元ケースの再出力・境界条件と寸法の確認・凹セル改善・通常実行は残作業**である。小ケースの成功を、元ケースの物理条件やメッシュ品質の修正完了とは扱わない。
 
 ## 修正内容
 
-| 項目 | 生成・検査の変更 | 残る確認 |
+| 項目 | 生成・検査の変更 | 確認済み範囲・残る確認 |
 |---|---|---|
-| PIMPLE residualControl | pまたはp_rgh、Uにtolerance/relTol辞書を出力 | v2412での通常起動 |
-| SIMPLE / PISO | SIMPLEはスカラー基準を維持、PISOは外部反復用residualControlを出力しない | 小ケースで別々に通常実行 |
+| PIMPLE residualControl | pまたはp_rgh、Uにtolerance/relTol辞書を出力 | 外部反復上限1/3のpimpleFoam、p_rghを使うinterFoamの小ケースが通常終了。長時間安定性は未検証 |
+| SIMPLE / PISO | SIMPLEはスカラー基準を維持、PISOは外部反復用residualControlを出力しない | simpleFoamとicoFoamの小ケースを別々に通常実行し正常終了 |
 | 実出口の圧力 | 背景/STLの出所を表示。流入・圧力条件・初期Uの組合せを事前/実メッシュで確認 | 元ケースの実出口へ意図した用途を指定 |
 | 逆流の乱流量 | pressureOutletでU=pressureInletOutletVelocity、k/omega等はinletOutletと入口値 | 逆流の発生と境界値の妥当性 |
-| 流量監視 | 複数候補選択、名前変更の追従、個別流量と符号付き和。自動選択は実パッチへ絞る | 監視データの実出力 |
-| 残差監視 | solverInfoへ変更。解く場から自動選択し手動指定も検査 | 実出力とソルバー残差履歴 |
+| 流量監視 | 複数候補選択、名前変更の追従、個別流量と符号付き和。自動選択は実パッチへ絞る | 6ケースで監視出力・入口/出口の符号・時刻・個別流量と合計の一致を確認。元ケースは再出力後に確認 |
+| 残差監視 | solverInfoへ変更。解く場から自動選択し手動指定も検査 | 6ケースでsolverInfoの数値記録を確認。元ケースと全物理モデルは未検証 |
 | 対称条件 | symmetry / symmetryPlane / emptyを明示。STLの平面性・法線、背景の厚み1セルを検査 | symmery.stlの解析意図。最終メッシュでの要件 |
 | checkMesh | 毎回新規実行。終了コードとログのMesh OK./End/Failedを確認。メッシュのSHA-256を前後比較 | 元メッシュの凹セル位置と原因 |
 | 層厚 | 相対/絶対m、膨張率、最小総厚さを入力。層数から第一層・総厚さを表示し整合検査 | 実際の層の残存・品質・yPlus |
@@ -83,13 +86,16 @@ python3 scripts/run-native-smoke.py /tmp/v2412-builder-smoke
 PIMPLE外部反復1/3、SIMPLE、PISO、p_rghを使うVOF、STLチャネルの6ケースを作る。非定常ケースはadjustTimeStep=noで0.005 sまでの小テストとし、endTimeを短くしただけで最初の可変時間刻みを制限できるとは扱わない。
 実行スクリプトは通常のソルバーを起動し、solverInfo・入口/出口の個別流量・符号付き和のファイルと時刻を確認する。`native-results.json`は実際に通過したケースだけを記録する。dry-runの成否を通常起動の判定には使わない。
 
-この環境で確認したのは6ケースの**生成**まで。元ケースの実メッシュ検査と通常ソルバー実行には、元ケースZIP（constant/polyMesh、0、system、constant/triSurface、可能なら作業JSON）が必要である。1ステップ成功も、本解析の妥当性確認には代えない。
+作者側では6ケースの生成までを確認していたが、2026-09-06にユーザー環境で上記6ケースの実行・監視の正常終了が報告された。`runtime-generation.test.cjs`と、コマンドを模擬する`test_runtime_check.py`の21テストも成功した。模擬テストの成功と実OpenFOAMでの6ケース成功は別の検証結果として記録する。
+
+全リポジトリの全テストの再実行、並列計算、長時間計算、層追加ケース、全物理モデルの網羅検証は今回のユーザー確認に含まれない。元ケースについては[残作業6項目](verification-v2412-2026-09-06.md#元ケースで残る作業)に従い、設定確認・品質改善・ケース一式の再出力後に検査と通常実行を行う。短時間の成功は、本解析の妥当性確認には代えない。
 
 ## 根拠
 
 - PIMPLE形式とadjustPhi、監視先のエラー: ユーザー提供のv2412 patch=260127通常実行ログ。原ケースは未受領。
+- [2026-09-06の実行確認記録](verification-v2412-2026-09-06.md): ユーザー提供の修正版検証結果。6ケースの通常終了と残差・流量監視を確認済みとする根拠。作者側による実行や生ログの再検証ではない。
 - [v2412 solverInfo API](https://api.openfoam.com/2412/classFoam_1_1functionObjects_1_1solverInfo.html)、[v2412 post-processing](https://www.openfoam.com/news/main-news/openfoam-v2412/post-processing): solverInfoの登録・残差監視。
-- [surfaceFieldValue](https://doc.openfoam.com/2306/tools/post-processing/function-objects/field/surfaceFieldValue/): patchの流束集計。複数パッチのnames指定のv2412実行は受入スクリプトで確認する。
+- [surfaceFieldValue](https://doc.openfoam.com/2306/tools/post-processing/function-objects/field/surfaceFieldValue/): patchの流束集計。v2412での個別流量と複数パッチ合計の一致は、上記ユーザー報告の6ケースで確認済み。
 - [symmetryPlane v2412 source](https://api.openfoam.com/2412/symmetryPlanePolyPatch_8C_source.html): 共通法線と平面性の制約。
 - [layerParameters source](https://api.openfoam.com/2312/layerParameters_8H_source.html): minThicknessは最小総厚さ。
 - [checkMesh writeSets](https://www.openfoam.com/news/main-news/openfoam-v3.0/meshing): 不良セットの可視化出力。v2412での合否の終了コード挙動はユーザーの実行報告に基づく。
